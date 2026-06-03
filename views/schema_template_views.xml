@@ -10,6 +10,8 @@
                 <header>
                     <button string="Use This Template" name="action_use_template" type="object" class="btn-primary"/>
                     <button string="Duplicate Template" name="action_duplicate_template" type="object" class="btn-secondary"/>
+                    <button string="Format JSON" name="action_format_json_fields" type="object" class="btn-secondary"/>
+                    <button string="Validate JSON" name="action_validate_json_fields" type="object" class="btn-secondary"/>
                 </header>
                 <sheet>
                     <widget name="web_ribbon" title="System Template"
@@ -31,6 +33,7 @@
                             <field name="active"/>
                             <field name="is_system_template"
                                    groups="base.group_system"/>
+                            <field name="load_optional_fields_by_default"/>
                             <field name="required_field_count" readonly="1"/>
                             <field name="optional_field_count" readonly="1"/>
                         </group>
@@ -47,6 +50,7 @@
                             <group string="Default JSON Structure">
                                 <field name="json_template" nolabel="1"
                                        widget="text"
+                                       class="o_midvex_json_editor o_midvex_json_editor_large"
                                        placeholder='{"@context":"https://schema.org","@type":"Product","name":"","url":""}'/>
                             </group>
                         </page>
@@ -58,22 +62,26 @@
                                 <group string="Required Fields (JSON array)">
                                     <field name="required_fields_json" nolabel="1"
                                            widget="text"
+                                           class="o_midvex_json_editor"
                                            placeholder='["name","description","image","url"]'/>
                                 </group>
                                 <group string="Optional Fields (JSON array)">
                                     <field name="optional_fields_json" nolabel="1"
                                            widget="text"
+                                           class="o_midvex_json_editor"
                                            placeholder='["brand.@id","offers.price","offers.priceCurrency"]'/>
                                 </group>
                             </group>
                             <group string="Auto-fill Mapping (JSON object)">
                                 <field name="auto_mapping_json" nolabel="1"
                                        widget="text"
+                                       class="o_midvex_json_editor"
                                        placeholder='{"name":"name","description":"description","url":"url"}'/>
                             </group>
                             <group string="Validation Rules (JSON object)">
                                 <field name="validation_rules_json" nolabel="1"
                                        widget="text"
+                                       class="o_midvex_json_editor"
                                        placeholder='{}'/>
                             </group>
                         </page>

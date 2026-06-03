@@ -170,6 +170,10 @@ class TestSchemaRecord(TransactionCase):
         self.assertEqual(record.schema_type, 'Product')
         required_keys = set(record.field_value_ids.filtered('required').mapped('field_key'))
         self.assertTrue({'name', 'description', 'image'}.issubset(required_keys))
+        all_keys = set(record.field_value_ids.mapped('field_key'))
+        self.assertIn('url', all_keys)
+        self.assertIn('brand.@id', all_keys)
+        self.assertIn('offers.priceSpecification.description', all_keys)
 
     def test_template_target_recommendations(self):
         product = self.env.ref('midvex_schema_manager.schema_template_product')
@@ -192,6 +196,27 @@ class TestSchemaRecord(TransactionCase):
         count_after_first = len(record.field_value_ids)
         record.action_add_optional_fields()
         self.assertEqual(len(record.field_value_ids), count_after_first)
+
+    def test_json_editors_do_not_use_ace_widget(self):
+        record_view = self.env.ref('midvex_schema_manager.view_midvex_schema_record_form')
+        template_view = self.env.ref('midvex_schema_manager.view_midvex_schema_template_form')
+        self.assertNotIn('widget="ace"', record_view.arch_db)
+        self.assertNotIn('widget="ace"', template_view.arch_db)
+        self.assertIn('o_midvex_json_editor', record_view.arch_db)
+        self.assertIn('o_midvex_json_editor', template_view.arch_db)
+
+    def test_localbusiness_template_exists(self):
+        template = self.env.ref('midvex_schema_manager.schema_template_localbusiness')
+        self.assertEqual(template.schema_type, 'LocalBusiness')
+        self.assertIn('address.streetAddress', template.get_optional_fields())
+
+    def test_create_page_wizard_prefills_target_url_from_context(self):
+        wizard = self.env['midvex.schema.page.wizard'].with_context(
+            current_url='/test-product'
+        ).create({
+            'schema_template_id': self.env.ref('midvex_schema_manager.schema_template_product').id,
+        })
+        self.assertEqual(wizard.target_url, '/test-product')
 
     def test_field_type_inference(self):
         self.assertEqual(_infer_schema_field_type('url'), 'url')

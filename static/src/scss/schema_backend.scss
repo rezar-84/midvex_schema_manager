@@ -1,0 +1,12 @@
+.o_midvex_json_editor textarea,
+.o_midvex_json_editor .o_input {
+    min-height: 300px !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    line-height: 1.45;
+    tab-size: 2;
+}
+
+.o_midvex_json_editor_large textarea,
+.o_midvex_json_editor_large .o_input {
+    min-height: 420px !important;
+}

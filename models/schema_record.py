@@ -108,8 +108,29 @@ def _infer_schema_field_type(field_key):
 
 
 def _schema_field_label(field_key):
-    if field_key == 'url':
-        return 'Schema URL / Canonical URL'
+    labels = {
+        'name': 'Name',
+        'description': 'Description',
+        'image': 'Image URL',
+        'logo': 'Logo URL',
+        'url': 'Schema URL / Canonical URL',
+        'sku': 'SKU',
+        'category': 'Category',
+        'brand.@id': 'Brand Organization ID',
+        'manufacturer.@id': 'Manufacturer Organization ID',
+        'offers.url': 'Offer URL',
+        'offers.availability': 'Availability',
+        'offers.priceSpecification.priceCurrency': 'Currency',
+        'offers.priceSpecification.description': 'Price Description',
+        'inLanguage': 'Language',
+        'sameAs': 'Same As Links',
+        'availableLanguage': 'Available Languages',
+        'openingHoursSpecification': 'Opening Hours',
+        'geo.latitude': 'Latitude',
+        'geo.longitude': 'Longitude',
+    }
+    if field_key in labels:
+        return labels[field_key]
     label = (field_key or '').replace('@', '').replace('.', ' / ').replace('_', ' ')
     return label.title()
 
@@ -309,6 +330,30 @@ class MidvexSchemaRecord(models.Model):
                 _set_nested_value(data, fv.field_key, val)
 
         return data
+
+    def _get_base_url(self):
+        self.ensure_one()
+        domain = ''
+        if self.website_id and self.website_id.domain:
+            domain = self.website_id.domain.strip()
+        if domain:
+            return domain.rstrip('/') if domain.startswith('http') else 'https://' + domain.rstrip('/')
+        settings = self.env['midvex.schema.settings'].search([
+            ('website_id', '=', self.website_id.id),
+        ], limit=1)
+        if settings:
+            return settings._get_base_url(self.website_id)
+        return ''
+
+    def _get_absolute_target_url(self):
+        self.ensure_one()
+        target = self.target_url or ''
+        if not target:
+            return ''
+        if _URL_RE.match(target):
+            return target
+        base = self._get_base_url()
+        return base + target if base else target
 
     def _build_faqpage_json(self, lang_code=None):
         self.ensure_one()
@@ -527,6 +572,29 @@ class MidvexSchemaRecord(models.Model):
         self.generate_json()
         return True
 
+    def action_format_manual_json(self):
+        for record in self:
+            if record.manual_json:
+                parsed = json.loads(record.manual_json)
+                record.manual_json = json.dumps(parsed, ensure_ascii=False, indent=2)
+        return True
+
+    def action_validate_manual_json(self):
+        self.ensure_one()
+        if not self.manual_json:
+            raise ValidationError('Manual JSON is empty.')
+        json.loads(self.manual_json)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'JSON is valid',
+                'message': 'Manual JSON override is valid JSON.',
+                'type': 'success',
+                'sticky': False,
+            },
+        }
+
     def action_open_rich_results_test(self):
         self.ensure_one()
         url = self.target_url or ''
@@ -577,9 +645,31 @@ class MidvexSchemaRecord(models.Model):
         candidates = {
             'name': meta_title,
             'description': meta_description,
-            'url': self.target_url or '',
+            'url': self._get_absolute_target_url() or self.target_url or '',
             'inLanguage': self.lang_code,
         }
+        if view:
+            image = (
+                getattr(view, 'website_meta_og_img', '') or
+                getattr(view, 'website_meta_image', '') or
+                getattr(view, 'website_meta_og_image', '')
+            )
+            if image:
+                candidates['image'] = image
+
+        if self.schema_type == 'Product':
+            settings = self.env['midvex.schema.settings'].search([
+                ('website_id', '=', self.website_id.id),
+                ('enable_global_schema', '=', True),
+            ], limit=1)
+            base = settings._get_base_url(self.website_id) if settings else self._get_base_url()
+            if base:
+                candidates.setdefault('brand.@id', base + '/#organization')
+                candidates.setdefault('manufacturer.@id', base + '/#organization')
+            candidates.setdefault('offers.availability', 'https://schema.org/LimitedAvailability')
+            candidates.setdefault('offers.priceSpecification.priceCurrency', '')
+            candidates.setdefault('offers.priceSpecification.description', 'Price available upon request.')
+            candidates.setdefault('offers.url', candidates.get('url', ''))
 
         if self.schema_template_id:
             for schema_field, odoo_key in self.schema_template_id.get_auto_mapping().items():
@@ -819,7 +909,14 @@ class MidvexSchemaRecord(models.Model):
             return
         self.schema_type = self.schema_template_id.schema_type
         self.target_type = self.schema_template_id.get_recommended_target_type()
-        self.field_value_ids = [(5, 0, 0)] + self._prepare_template_field_commands(required=True, optional=False)
+        commands = [(5, 0, 0)] + self._prepare_template_field_commands(
+            required=True, optional=False, ignore_existing=True
+        )
+        if self.schema_template_id.load_optional_fields_by_default:
+            commands += self._prepare_template_field_commands(
+                required=False, optional=True, ignore_existing=True
+            )
+        self.field_value_ids = commands
         if self.schema_type in ('Organization', 'WebSite') and self.target_type == 'url':
             return {
                 'warning': {
@@ -833,7 +930,7 @@ class MidvexSchemaRecord(models.Model):
         if self.website_page_id and not self.target_url:
             self.target_url = self.website_page_id.url
 
-    def _prepare_template_field_commands(self, required=True, optional=False):
+    def _prepare_template_field_commands(self, required=True, optional=False, ignore_existing=False):
         self.ensure_one()
         if not self.schema_template_id:
             return []
@@ -844,7 +941,7 @@ class MidvexSchemaRecord(models.Model):
         if optional:
             field_keys.extend(self.schema_template_id.get_optional_fields())
 
-        existing_keys = set(self.field_value_ids.mapped('field_key'))
+        existing_keys = set() if ignore_existing else set(self.field_value_ids.mapped('field_key'))
         commands = []
         sequence = 10
         for field_key in field_keys:
@@ -865,6 +962,18 @@ class MidvexSchemaRecord(models.Model):
         commands = self._prepare_template_field_commands(required=required, optional=optional)
         if commands:
             self.write({'field_value_ids': commands})
+
+    def action_reset_fields_from_template(self):
+        for record in self:
+            if not record.schema_template_id:
+                continue
+            commands = [(5, 0, 0)] + record._prepare_template_field_commands(
+                required=True, optional=False, ignore_existing=True
+            )
+            record.write({'field_value_ids': commands})
+            if record.schema_template_id.load_optional_fields_by_default:
+                record.action_add_optional_fields()
+        return True
 
     @api.model
     def regenerate_all_active_schemas(self):
@@ -899,6 +1008,8 @@ class MidvexSchemaRecord(models.Model):
         for record in records:
             if record.schema_template_id and not record.field_value_ids:
                 record._add_template_fields(required=True, optional=False)
+                if record.schema_template_id.load_optional_fields_by_default:
+                    record.action_add_optional_fields()
             if record.schema_template_id and record.target_type == 'url' and record.schema_type in ('Organization', 'WebSite'):
                 super(MidvexSchemaRecord, record).write({
                     'duplicate_warning': '%s schema is normally global. Use Target Type = Global unless this is intentional.' % record.schema_type

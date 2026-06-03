@@ -48,4 +48,11 @@
               sequence="5"
               groups="midvex_schema_manager.group_midvex_schema_manager"/>
 
+    <menuitem id="menu_midvex_schema_batch"
+              name="Batch Operations"
+              parent="menu_midvex_structured_data_root"
+              action="action_midvex_schema_batch_wizard"
+              sequence="6"
+              groups="midvex_schema_manager.group_midvex_schema_manager"/>
+
 </odoo>

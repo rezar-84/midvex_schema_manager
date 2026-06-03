@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="1">
+    <data>
 
         <!-- 1. Organization -->
         <record id="schema_template_organization" model="midvex.schema.template">
@@ -8,6 +8,7 @@
             <field name="schema_type">Organization</field>
             <field name="sequence">1</field>
             <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
             <field name="active">True</field>
             <field name="description">Identifies the organization behind the website. Recommended on every site.</field>
             <field name="json_template"><![CDATA[{
@@ -40,6 +41,7 @@
             <field name="schema_type">WebSite</field>
             <field name="sequence">2</field>
             <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
             <field name="active">True</field>
             <field name="description">Identifies the website. Used to enable the Sitelinks Searchbox in Google.</field>
             <field name="json_template"><![CDATA[{
@@ -60,29 +62,38 @@
             <field name="schema_type">Product</field>
             <field name="sequence">3</field>
             <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
             <field name="active">True</field>
-            <field name="description">Describes a product. Enables rich results with price, availability and reviews in Google.</field>
+            <field name="description">Describes a product. B2B-safe by default with quote-based offer fields and no fake price requirement.</field>
             <field name="json_template"><![CDATA[{
   "@context": "https://schema.org",
   "@type": "Product",
   "name": "",
   "description": "",
   "image": "",
+  "url": "",
+  "sku": "",
+  "category": "",
   "brand": {
-    "@type": "Brand",
-    "name": ""
+    "@id": ""
+  },
+  "manufacturer": {
+    "@id": ""
   },
   "offers": {
     "@type": "Offer",
-    "price": "",
-    "priceCurrency": "USD",
-    "availability": "https://schema.org/InStock",
-    "url": ""
+    "url": "",
+    "availability": "https://schema.org/LimitedAvailability",
+    "priceSpecification": {
+      "@type": "PriceSpecification",
+      "priceCurrency": "",
+      "description": "Price available upon request."
+    }
   }
 }]]></field>
             <field name="required_fields_json"><![CDATA[["name", "description", "image"]]]></field>
-            <field name="optional_fields_json"><![CDATA[["brand", "offers", "sku", "gtin", "aggregateRating"]]]></field>
-            <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "image": "image", "url": "url"}]]></field>
+            <field name="optional_fields_json"><![CDATA[["url", "sku", "category", "brand.@id", "manufacturer.@id", "offers.url", "offers.availability", "offers.priceSpecification.priceCurrency", "offers.priceSpecification.description"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "image": "image", "url": "url", "brand.@id": "brand.@id", "manufacturer.@id": "manufacturer.@id"}]]></field>
         </record>
 
         <!-- 4. FAQPage -->
@@ -127,6 +138,7 @@
             <field name="schema_type">Article</field>
             <field name="sequence">6</field>
             <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
             <field name="active">True</field>
             <field name="description">Marks up a news or editorial article. Enables rich results in Google News and Discover.</field>
             <field name="json_template"><![CDATA[{
@@ -163,6 +175,7 @@
             <field name="schema_type">BlogPosting</field>
             <field name="sequence">7</field>
             <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
             <field name="active">True</field>
             <field name="description">Marks up a blog post. Sub-type of Article, optimised for blogs.</field>
             <field name="json_template"><![CDATA[{
@@ -195,6 +208,7 @@
             <field name="schema_type">Service</field>
             <field name="sequence">8</field>
             <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
             <field name="active">True</field>
             <field name="description">Describes a service offered by the organization.</field>
             <field name="json_template"><![CDATA[{
@@ -222,6 +236,7 @@
             <field name="schema_type">ContactPage</field>
             <field name="sequence">9</field>
             <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
             <field name="active">True</field>
             <field name="description">Identifies a contact page. Helps search engines understand the page purpose.</field>
             <field name="json_template"><![CDATA[{
@@ -243,6 +258,7 @@
             <field name="schema_type">AboutPage</field>
             <field name="sequence">10</field>
             <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
             <field name="active">True</field>
             <field name="description">Identifies an about/company page. Helps search engines understand the page purpose.</field>
             <field name="json_template"><![CDATA[{
@@ -298,6 +314,191 @@
             <field name="required_fields_json"><![CDATA[["itemListElement"]]]></field>
             <field name="optional_fields_json"><![CDATA[["name", "description", "numberOfItems"]]]></field>
             <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "url": "url"}]]></field>
+        </record>
+
+        <!-- 13. LocalBusiness -->
+        <record id="schema_template_localbusiness" model="midvex.schema.template">
+            <field name="name">LocalBusiness</field>
+            <field name="schema_type">LocalBusiness</field>
+            <field name="sequence">13</field>
+            <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
+            <field name="active">True</field>
+            <field name="description">Local SEO schema for a physical business, including address, contact, opening hours and geo coordinates.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "",
+  "url": "",
+  "telephone": "",
+  "email": "",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "",
+    "addressLocality": "",
+    "addressRegion": "",
+    "postalCode": "",
+    "addressCountry": ""
+  },
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": "",
+    "longitude": ""
+  },
+  "openingHoursSpecification": [],
+  "sameAs": []
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name", "url"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["telephone", "email", "address.streetAddress", "address.addressLocality", "address.addressRegion", "address.postalCode", "address.addressCountry", "geo.latitude", "geo.longitude", "openingHoursSpecification", "sameAs"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "url": "url"}]]></field>
+        </record>
+
+        <!-- 14. ProfessionalService -->
+        <record id="schema_template_professionalservice" model="midvex.schema.template">
+            <field name="name">ProfessionalService</field>
+            <field name="schema_type">ProfessionalService</field>
+            <field name="sequence">14</field>
+            <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
+            <field name="active">True</field>
+            <field name="description">Local business schema for professional service providers.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "ProfessionalService",
+  "name": "",
+  "description": "",
+  "url": "",
+  "telephone": "",
+  "address": {
+    "@type": "PostalAddress"
+  },
+  "areaServed": ""
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name", "url"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["description", "telephone", "address.streetAddress", "address.addressLocality", "address.addressCountry", "areaServed"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "url": "url"}]]></field>
+        </record>
+
+        <!-- 15. Place -->
+        <record id="schema_template_place" model="midvex.schema.template">
+            <field name="name">Place</field>
+            <field name="schema_type">Place</field>
+            <field name="sequence">15</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Describes a physical place with address and geo coordinates.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "Place",
+  "name": "",
+  "address": {
+    "@type": "PostalAddress"
+  },
+  "geo": {
+    "@type": "GeoCoordinates"
+  }
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["address.streetAddress", "address.addressLocality", "address.addressCountry", "geo.latitude", "geo.longitude"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name"}]]></field>
+        </record>
+
+        <!-- 16. Google Merchant Product Schema -->
+        <record id="schema_template_google_merchant_product" model="midvex.schema.template">
+            <field name="name">Google Merchant Product Schema</field>
+            <field name="schema_type">Product</field>
+            <field name="sequence">16</field>
+            <field name="is_system_template">True</field>
+            <field name="load_optional_fields_by_default">True</field>
+            <field name="active">True</field>
+            <field name="description">Product schema checklist template for Google Merchant readiness. Price remains optional unless real commerce data is available.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "",
+  "description": "",
+  "image": "",
+  "url": "",
+  "sku": "",
+  "category": "",
+  "brand": {
+    "@id": ""
+  },
+  "offers": {
+    "@type": "Offer",
+    "url": "",
+    "availability": "https://schema.org/LimitedAvailability",
+    "priceSpecification": {
+      "@type": "PriceSpecification",
+      "priceCurrency": "",
+      "description": "Price available upon request."
+    }
+  }
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name", "description", "image"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["url", "sku", "category", "brand.@id", "manufacturer.@id", "offers.url", "offers.availability", "offers.priceSpecification.priceCurrency", "offers.priceSpecification.description"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "image": "image", "url": "url"}]]></field>
+        </record>
+
+        <!-- 17. PostalAddress -->
+        <record id="schema_template_postaladdress" model="midvex.schema.template">
+            <field name="name">PostalAddress</field>
+            <field name="schema_type">PostalAddress</field>
+            <field name="sequence">17</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Reusable address schema for local business and place records.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "PostalAddress",
+  "streetAddress": "",
+  "addressLocality": "",
+  "addressRegion": "",
+  "postalCode": "",
+  "addressCountry": ""
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["addressCountry"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["streetAddress", "addressLocality", "addressRegion", "postalCode"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{}]]></field>
+        </record>
+
+        <!-- 18. OpeningHoursSpecification -->
+        <record id="schema_template_openinghours" model="midvex.schema.template">
+            <field name="name">OpeningHoursSpecification</field>
+            <field name="schema_type">OpeningHoursSpecification</field>
+            <field name="sequence">18</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Opening-hours schema. Use JSON values for dayOfWeek arrays when needed.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "OpeningHoursSpecification",
+  "dayOfWeek": [],
+  "opens": "",
+  "closes": ""
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["dayOfWeek", "opens", "closes"]]]></field>
+            <field name="optional_fields_json"><![CDATA[[]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{}]]></field>
+        </record>
+
+        <!-- 19. GeoCoordinates -->
+        <record id="schema_template_geocoordinates" model="midvex.schema.template">
+            <field name="name">GeoCoordinates</field>
+            <field name="schema_type">GeoCoordinates</field>
+            <field name="sequence">19</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Latitude and longitude schema for local business locations.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "GeoCoordinates",
+  "latitude": "",
+  "longitude": ""
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["latitude", "longitude"]]]></field>
+            <field name="optional_fields_json"><![CDATA[[]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{}]]></field>
         </record>
 
     </data>

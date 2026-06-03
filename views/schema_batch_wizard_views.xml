@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_midvex_schema_batch_wizard_form" model="ir.ui.view">
+        <field name="name">midvex.schema.batch.wizard.form</field>
+        <field name="model">midvex.schema.batch.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Structured Data Batch Operations">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        Run safe maintenance operations for active schema records. These operations update backend previews and validation status only.
+                    </div>
+                    <group>
+                        <field name="website_id"/>
+                        <field name="operation"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Run" name="action_run" type="object" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_midvex_schema_batch_wizard" model="ir.actions.act_window">
+        <field name="name">Batch Operations</field>
+        <field name="res_model">midvex.schema.batch.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

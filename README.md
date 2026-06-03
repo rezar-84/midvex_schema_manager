@@ -83,6 +83,8 @@ The form shows a resolved URL preview and a validation banner near the top so yo
 
 Language is set once on the parent Page Schema record. Child field, FAQ, and breadcrumb lines do not show language in the normal UI.
 
+Templates can mark **Load optional fields by default**. This loads useful optional fields automatically, while **Add Optional Fields** still adds missing optional rows later without duplicates. **Reset Fields from Template** rebuilds rows from the selected template.
+
 ---
 
 ## Language Strategy
@@ -122,6 +124,7 @@ returns only records matching the current language.
 Buttons on the form:
 - **Open Schema Markup Validator** → [validator.schema.org](https://validator.schema.org/)
 - **Open Google Rich Results Test** → pre-filled with the record's target URL
+- **Format JSON** / **Validate JSON** → available in advanced JSON areas
 
 ### Admin JSON Preview
 
@@ -148,6 +151,13 @@ Buttons on the form:
 | 10 | AboutPage | About / company page |
 | 11 | CollectionPage | Category / listing pages |
 | 12 | ItemList | Carousel-eligible lists |
+| 13 | LocalBusiness | Local SEO for physical businesses |
+| 14 | ProfessionalService | Service-provider local business schema |
+| 15 | Place | Physical place with address and geo |
+| 16 | Google Merchant Product Schema | Product checklist template for Merchant readiness |
+| 17 | PostalAddress | Address component schema |
+| 18 | OpeningHoursSpecification | Opening hours component schema |
+| 19 | GeoCoordinates | Latitude/longitude component schema |
 
 Open **Website → Configuration → Structured Data → Template Library** to browse templates in a kanban library. Each card shows the schema type, description, required field count, and whether the template is system or custom.
 
@@ -164,6 +174,15 @@ System templates show a warning in the editor; duplicate them before making cust
 FAQPage schema is manually managed. Add FAQ items only when the same questions and answers are visible on the target page; validation fails until at least one active FAQ item exists.
 
 BreadcrumbList schema has editable breadcrumb lines. Use **Suggest Breadcrumbs from URL** to create Home plus one item per URL segment, then adjust names and URLs as needed. Validation warns when positions are not sequential.
+
+## Batch Operations
+
+Open **Website → Configuration → Structured Data → Batch Operations** to run safe backend maintenance:
+
+- Validate all active schemas for a website
+- Generate previews for all active schemas for a website
+
+These operations update backend validation status and cached previews. They do not change public rendering behavior.
 
 ---
 

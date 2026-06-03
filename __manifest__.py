@@ -43,12 +43,15 @@ Features:
         'views/schema_record_views.xml',
         'views/schema_lang_wizard_views.xml',
         'views/schema_page_wizard_views.xml',
+        'views/schema_batch_wizard_views.xml',
         'views/schema_menu.xml',
         # 4. Website frontend injection (last — extends website.layout)
         'views/schema_website_injection.xml',
     ],
     'assets': {
-        'web.assets_backend': [],
+        'web.assets_backend': [
+            'midvex_schema_manager/static/src/scss/schema_backend.scss',
+        ],
         'website.assets_frontend': [],
     },
     'images': ['static/description/icon.png'],

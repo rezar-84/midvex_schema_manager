@@ -19,6 +19,8 @@
                             type="object" invisible="not schema_template_id"/>
                     <button string="Add Optional Fields" name="action_add_optional_fields"
                             type="object" invisible="not schema_template_id"/>
+                    <button string="Reset Fields from Template" name="action_reset_fields_from_template"
+                            type="object" invisible="not schema_template_id" confirm="This will replace all field rows from the selected template. Continue?"/>
                     <button string="Create for All Languages" name="action_open_lang_wizard"
                             type="object" class="btn-secondary"/>
                     <field name="validation_status" widget="statusbar"
@@ -264,8 +266,15 @@
                             </group>
                             <group invisible="not manual_json_enabled"
                                    string="Manual JSON Override">
+                                <div class="mb-2">
+                                    <button string="Format JSON" name="action_format_manual_json"
+                                            type="object" class="btn-secondary me-2"/>
+                                    <button string="Validate JSON" name="action_validate_manual_json"
+                                            type="object" class="btn-secondary"/>
+                                </div>
                                 <field name="manual_json" nolabel="1"
                                        widget="text"
+                                       class="o_midvex_json_editor o_midvex_json_editor_large"
                                        placeholder='{"@context":"https://schema.org","@type":"WebPage","name":"Example"}'/>
                             </group>
                         </page>

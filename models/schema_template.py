@@ -24,6 +24,10 @@ class MidvexSchemaTemplate(models.Model):
     sequence = fields.Integer('Sequence', default=10)
     is_system_template = fields.Boolean('System Template', default=False,
                                          help='System templates cannot be deleted')
+    load_optional_fields_by_default = fields.Boolean(
+        'Load optional fields by default',
+        help='Create optional field rows automatically when this template is selected.',
+    )
     required_field_count = fields.Integer(
         'Required Fields', compute='_compute_field_counts', store=False
     )
@@ -70,6 +74,41 @@ class MidvexSchemaTemplate(models.Model):
             return json.loads(self.validation_rules_json or '{}')
         except (json.JSONDecodeError, TypeError):
             return {}
+
+    def _json_field_names(self):
+        return [
+            'json_template',
+            'required_fields_json',
+            'optional_fields_json',
+            'auto_mapping_json',
+            'validation_rules_json',
+        ]
+
+    def action_format_json_fields(self):
+        for rec in self:
+            vals = {}
+            for fname in rec._json_field_names():
+                raw = getattr(rec, fname)
+                if not raw:
+                    continue
+                parsed = json.loads(raw)
+                vals[fname] = json.dumps(parsed, ensure_ascii=False, indent=2)
+            if vals:
+                rec.write(vals)
+        return True
+
+    def action_validate_json_fields(self):
+        self._check_json_fields()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'JSON is valid',
+                'message': 'All template JSON fields are valid.',
+                'type': 'success',
+                'sticky': False,
+            },
+        }
 
     def get_recommended_target_type(self):
         self.ensure_one()

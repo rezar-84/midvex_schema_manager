@@ -1,4 +1,8 @@
+from urllib.parse import urlparse
+
 from odoo import api, fields, models
+
+from .schema_record import _strip_language_prefix, _get_active_language_url_codes, _get_schema_lang_code
 
 
 class MidvexSchemaPageWizard(models.TransientModel):
@@ -10,7 +14,7 @@ class MidvexSchemaPageWizard(models.TransientModel):
         default=lambda self: self.env['website'].get_current_website(),
     )
     target_url = fields.Char(
-        'Current / Target URL', required=True,
+        'Current / Target URL',
         help='Use /page-url, /tr/page-url, or a full https://example.com/page-url URL.'
     )
     website_page_id = fields.Many2one('website.page', string='Website Page')
@@ -26,6 +30,45 @@ class MidvexSchemaPageWizard(models.TransientModel):
     add_optional_fields = fields.Boolean('Add optional fields')
     auto_populate = fields.Boolean('Auto-fill from page SEO metadata', default=True)
 
+    @api.model
+    def default_get(self, fields_list):
+        vals = super().default_get(fields_list)
+        website = self.env['website'].browse(vals.get('website_id')) if vals.get('website_id') else self.env['website'].get_current_website()
+        context = self.env.context
+        raw_url = (
+            context.get('current_url') or
+            context.get('target_url') or
+            context.get('active_url') or
+            context.get('default_target_url') or
+            ''
+        )
+        if not raw_url:
+            try:
+                from odoo.http import request
+                raw_url = getattr(request.httprequest, 'path', '') or ''
+                if getattr(request, 'lang', None) and request.lang.code:
+                    vals.setdefault('lang_code', _get_schema_lang_code(request.lang.code))
+            except Exception:
+                raw_url = ''
+        if raw_url:
+            path = urlparse(raw_url).path if raw_url.startswith('http') else raw_url
+            path = path or '/'
+            vals.setdefault('target_url', path)
+            active_lang_codes = _get_active_language_url_codes(website)
+            normalized = _strip_language_prefix(path, active_lang_codes)
+            page_domain = [('url', 'in', list({path, normalized} - {''}))]
+            if 'website_id' in self.env['website.page']._fields:
+                page_domain.append(('website_id', 'in', [False, website.id]))
+            page = self.env['website.page'].search(page_domain, limit=1)
+            if page:
+                vals.setdefault('website_page_id', page.id)
+                vals.setdefault('target_type', 'page')
+            else:
+                vals.setdefault('target_type', 'url')
+        vals.setdefault('website_id', website.id)
+        vals.setdefault('lang_code', _get_schema_lang_code(self.env.lang))
+        return vals
+
     @api.onchange('schema_template_id')
     def _onchange_schema_template_id(self):
         if self.schema_template_id:
@@ -36,6 +79,21 @@ class MidvexSchemaPageWizard(models.TransientModel):
         if self.website_page_id:
             self.target_type = 'page'
             self.target_url = self.website_page_id.url
+
+    @api.onchange('target_url', 'website_id')
+    def _onchange_target_url(self):
+        if not self.target_url or not self.website_id:
+            return
+        path = urlparse(self.target_url).path if self.target_url.startswith('http') else self.target_url
+        active_lang_codes = _get_active_language_url_codes(self.website_id)
+        normalized = _strip_language_prefix(path, active_lang_codes)
+        page_domain = [('url', 'in', list({path, normalized} - {''}))]
+        if 'website_id' in self.env['website.page']._fields:
+            page_domain.append(('website_id', 'in', [False, self.website_id.id]))
+        page = self.env['website.page'].search(page_domain, limit=1)
+        if page:
+            self.website_page_id = page
+            self.target_type = 'page'
 
     def action_create_schema(self):
         self.ensure_one()

@@ -23,6 +23,7 @@
                                    required="target_type == 'page'"/>
                             <field name="target_url"
                                    invisible="target_type == 'global'"
+                                   required="target_type == 'url'"
                                    placeholder="/page-url or https://example.com/page-url"/>
                             <field name="add_optional_fields"/>
                             <field name="auto_populate"/>
