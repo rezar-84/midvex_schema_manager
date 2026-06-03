@@ -214,11 +214,11 @@
                                 <field name="validation_message" nolabel="1"
                                        readonly="1" widget="text"/>
                             </group>
-                            <div class="o_form_buttons_view">
-                                <button string="Open Schema Markup Validator"
-                                        type="url"
-                                        url="https://validator.schema.org/"
-                                        class="btn-secondary me-2"/>
+                            <div class="mt-2">
+                                <a href="https://validator.schema.org/" target="_blank"
+                                   class="btn btn-secondary me-2">
+                                    Open Schema Markup Validator
+                                </a>
                                 <button string="Open Google Rich Results Test"
                                         name="action_open_rich_results_test"
                                         type="object"
@@ -302,13 +302,11 @@
                 <filter string="Page" name="page" domain="[('target_type','=','page')]"/>
                 <filter string="Custom URL" name="url" domain="[('target_type','=','url')]"/>
                 <separator/>
-                <group expand="0" string="Group By">
-                    <filter string="Website" name="group_by_website" context="{'group_by':'website_id'}"/>
-                    <filter string="Schema Type" name="group_by_type" context="{'group_by':'schema_type'}"/>
-                    <filter string="Language" name="group_by_lang" context="{'group_by':'lang_code'}"/>
-                    <filter string="Target Type" name="group_by_target" context="{'group_by':'target_type'}"/>
-                    <filter string="Validation Status" name="group_by_status" context="{'group_by':'validation_status'}"/>
-                </group>
+                <filter string="Group: Website" name="group_by_website" context="{'group_by':'website_id'}"/>
+                <filter string="Group: Schema Type" name="group_by_type" context="{'group_by':'schema_type'}"/>
+                <filter string="Group: Language" name="group_by_lang" context="{'group_by':'lang_code'}"/>
+                <filter string="Group: Target Type" name="group_by_target" context="{'group_by':'target_type'}"/>
+                <filter string="Group: Validation Status" name="group_by_status" context="{'group_by':'validation_status'}"/>
             </search>
         </field>
     </record>

@@ -100,9 +100,7 @@
                 <filter string="Custom Templates" name="custom" domain="[('is_system_template','=',False)]"/>
                 <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
                 <separator/>
-                <group expand="0" string="Group By">
-                    <filter string="Schema Type" name="group_by_type" context="{'group_by':'schema_type'}"/>
-                </group>
+                <filter string="Schema Type" name="group_by_type" context="{'group_by':'schema_type'}"/>
             </search>
         </field>
     </record>
