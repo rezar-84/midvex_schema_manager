@@ -15,6 +15,8 @@
                     <button string="Auto-populate" name="action_auto_populate"
                             type="object"
                             invisible="not auto_populate or target_type not in ('page',)"/>
+                    <button string="Create for All Languages" name="action_open_lang_wizard"
+                            type="object" class="btn-secondary"/>
                     <field name="validation_status" widget="statusbar"
                            statusbar_visible="draft,valid,warning,error"/>
                 </header>
@@ -248,6 +250,7 @@
                 </sheet>
                 <div class="oe_chatter">
                     <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
                     <field name="message_ids"/>
                 </div>
             </form>

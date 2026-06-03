@@ -17,6 +17,7 @@ class MidvexSchemaRecord(models.Model):
     _description = 'Midvex Schema Record'
     _rec_name = 'name'
     _order = 'priority desc, name'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
 
     name = fields.Char('Name', required=True)
     website_id = fields.Many2one(
@@ -326,6 +327,17 @@ class MidvexSchemaRecord(models.Model):
             'target': 'new',
         }
 
+    def action_open_lang_wizard(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Create for All Languages',
+            'res_model': 'midvex.schema.lang.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_schema_record_id': self.id},
+        }
+
     def action_auto_populate(self):
         self.ensure_one()
         page = self.website_page_id
@@ -463,6 +475,38 @@ class MidvexSchemaRecord(models.Model):
             names = ', '.join(duplicates.mapped('name'))
             return f'Possible duplicate schema found: {names}'
         return ''
+
+    @api.onchange('schema_template_id')
+    def _onchange_schema_template_id(self):
+        if not self.schema_template_id:
+            return
+        self.schema_type = self.schema_template_id.schema_type
+        self.field_value_ids = [(5, 0, 0)]
+        required_fields = self.schema_template_id.get_required_fields()
+        new_lines = []
+        for field_key in required_fields:
+            field_type = 'url' if field_key in ('url', 'image', 'logo') else 'char'
+            new_lines.append((0, 0, {
+                'field_key': field_key,
+                'field_label': field_key.replace('_', ' ').title(),
+                'field_type': field_type,
+                'required': True,
+            }))
+        self.field_value_ids = new_lines
+
+    @api.model
+    def regenerate_all_active_schemas(self):
+        records = self.search([('active', '=', True)])
+        for record in records:
+            try:
+                record.generate_json()
+                record.render_html()
+            except Exception as exc:
+                _logger.error(
+                    'midvex_schema_manager: error regenerating schema %s: %s',
+                    record.id, exc,
+                )
+        return True
 
     # ------------------------------------------------------------------
     # ORM overrides

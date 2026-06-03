@@ -33,6 +33,9 @@ class MidvexSchemaSettings(models.Model):
     )
     enable_website_schema = fields.Boolean('Enable WebSite Schema', default=True)
     enable_search_action = fields.Boolean('Enable SearchAction', default=False)
+    global_schema_preview = fields.Text(
+        'Global Schema Preview', compute='_compute_global_schema_preview', store=False
+    )
 
     _sql_constraints = [
         ('website_unique', 'UNIQUE(website_id)',
@@ -128,3 +131,22 @@ class MidvexSchemaSettings(models.Model):
             }
 
         return data
+
+    def _compute_global_schema_preview(self):
+        for rec in self:
+            parts = []
+            if rec.enable_global_schema:
+                try:
+                    parts.append(json.dumps(
+                        rec.generate_organization_json(), ensure_ascii=False, indent=2
+                    ))
+                except Exception:
+                    pass
+            if rec.enable_website_schema:
+                try:
+                    parts.append(json.dumps(
+                        rec.generate_website_json(), ensure_ascii=False, indent=2
+                    ))
+                except Exception:
+                    pass
+            rec.global_schema_preview = '\n\n'.join(parts) if parts else 'No global schemas enabled.'
