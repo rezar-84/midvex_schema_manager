@@ -10,11 +10,15 @@
                 <header>
                     <button string="Validate" name="action_validate"
                             type="object" class="btn-primary"/>
-                    <button string="Generate JSON" name="action_generate_json"
+                    <button string="Generate Preview" name="action_generate_json"
                             type="object"/>
                     <button string="Auto-populate" name="action_auto_populate"
                             type="object"
                             invisible="not auto_populate or target_type not in ('page',)"/>
+                    <button string="Add Required Fields" name="action_add_required_fields"
+                            type="object" invisible="not schema_template_id"/>
+                    <button string="Add Optional Fields" name="action_add_optional_fields"
+                            type="object" invisible="not schema_template_id"/>
                     <button string="Create for All Languages" name="action_open_lang_wizard"
                             type="object" class="btn-secondary"/>
                     <field name="validation_status" widget="statusbar"
@@ -35,6 +39,19 @@
                     <widget name="web_ribbon" title="Archived"
                             bg_color="bg-danger" invisible="active"/>
 
+                    <div class="alert alert-success" role="alert" invisible="validation_status != 'valid'">
+                        Valid schema. This record is ready to render when Active is enabled.
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="validation_status != 'warning'">
+                        <field name="validation_message" readonly="1" nolabel="1"/>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="validation_status != 'error'">
+                        <field name="validation_message" readonly="1" nolabel="1"/>
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="validation_status != 'draft'">
+                        Draft schema. Select a template, fill the required fields, then validate.
+                    </div>
+
                     <div class="oe_title">
                         <label for="name"/>
                         <h1><field name="name" placeholder="Schema Record Name"/></h1>
@@ -42,16 +59,19 @@
 
                     <group>
                         <group>
-                            <field name="schema_type"/>
                             <field name="schema_template_id"
-                                   domain="[('schema_type','=',schema_type)]"/>
+                                   placeholder="Start with Product, FAQPage, BreadcrumbList, Article, Service..."/>
+                            <field name="schema_type" readonly="schema_template_id"/>
+                            <field name="target_type" widget="radio" options="{'horizontal': true}"/>
+                            <field name="website_id"/>
                             <field name="lang_code" placeholder="en"/>
                             <field name="active"/>
                         </group>
                         <group>
-                            <field name="website_id"/>
                             <field name="priority"/>
                             <field name="validation_status" readonly="1"/>
+                            <field name="render_target_summary" readonly="1"/>
+                            <field name="resolved_url_preview" readonly="1"/>
                         </group>
                     </group>
 
@@ -60,13 +80,23 @@
                         <!-- Tab 1 — General -->
                         <page string="General" name="general">
                             <group string="Target">
-                                <field name="target_type" widget="radio" options="{'horizontal': true}"/>
+                                <div class="alert alert-info" role="alert" invisible="target_type != 'global'">
+                                    Rendered on all pages. Use rarely; global Organization/WebSite is usually handled by Global Website Schema.
+                                </div>
+                                <div class="alert alert-info" role="alert" invisible="target_type != 'page'">
+                                    Attach this schema to a specific Odoo website page.
+                                </div>
+                                <div class="alert alert-info" role="alert" invisible="target_type != 'url'">
+                                    Use this when the page cannot be selected from Odoo page records.
+                                </div>
                                 <field name="website_page_id"
                                        invisible="target_type != 'page'"
                                        required="target_type == 'page'"/>
                                 <field name="target_url"
                                        invisible="target_type == 'global'"
-                                       placeholder="/about or https://example.com/about"/>
+                                       placeholder="/page-url, /tr/page-url, or https://example.com/page-url"/>
+                                <field name="resolved_url_preview" readonly="1"
+                                       invisible="target_type == 'global'"/>
                             </group>
                             <group string="Options">
                                 <field name="auto_populate"/>
@@ -76,13 +106,17 @@
                         </page>
 
                         <!-- Tab 2 — Field Values -->
-                        <page string="Fields" name="field_values">
+                        <page string="Fields" name="field_values" invisible="schema_type == 'FAQPage'">
+                            <div class="alert alert-info" role="alert">
+                                Use field labels for normal editing. Advanced users can edit Field Key dot-paths such as brand.@id or offers.priceSpecification.priceCurrency.
+                            </div>
                             <field name="field_value_ids" nolabel="1">
                                 <list editable="bottom" optional="show">
                                     <field name="sequence" widget="handle"/>
-                                    <field name="field_key"/>
                                     <field name="field_label"/>
+                                    <field name="field_key"/>
                                     <field name="field_type"/>
+                                    <field name="required"/>
                                     <field name="value_char"
                                            invisible="field_type not in ('char',)"
                                            optional="show"/>
@@ -102,7 +136,6 @@
                                            invisible="field_type not in ('float',)"
                                            optional="hide"/>
                                     <field name="lang_code" optional="show"/>
-                                    <field name="required" optional="hide"/>
                                 </list>
                                 <form>
                                     <group>
@@ -139,12 +172,12 @@
                         </page>
 
                         <!-- Tab 3 — FAQ Items -->
-                        <page string="FAQ Items" name="faq_items">
-                            <div class="alert alert-info" role="alert"
-                                 invisible="schema_type == 'FAQPage'">
-                                FAQ items are used when Schema Type is set to <b>FAQPage</b>.
-                                Only add FAQ schema if the same questions and answers are visible on the page.
+                        <page string="FAQ Items" name="faq_items" invisible="schema_type != 'FAQPage'">
+                            <div class="alert alert-warning" role="alert">
+                                Only use FAQPage schema if the same FAQ content is visible on the page.
                             </div>
+                            <button string="Add Sample FAQ" name="action_add_sample_faq"
+                                    type="object" class="btn-secondary mb-2"/>
                             <field name="faq_item_ids" nolabel="1">
                                 <list editable="bottom">
                                     <field name="position" widget="handle"/>
@@ -166,12 +199,12 @@
                         </page>
 
                         <!-- Tab 4 — Breadcrumb Items -->
-                        <page string="Breadcrumb Items" name="breadcrumb_items">
-                            <div class="alert alert-info" role="alert"
-                                 invisible="schema_type == 'BreadcrumbList'">
-                                Breadcrumb items are used when Schema Type is set to <b>BreadcrumbList</b>.
+                        <page string="Breadcrumb Items" name="breadcrumb_items" invisible="schema_type != 'BreadcrumbList'">
+                            <div class="alert alert-info" role="alert">
                                 Positions must be sequential starting from 1.
                             </div>
+                            <button string="Suggest Breadcrumbs from URL" name="action_suggest_breadcrumbs"
+                                    type="object" class="btn-secondary mb-2"/>
                             <field name="breadcrumb_item_ids" nolabel="1">
                                 <list editable="bottom">
                                     <field name="position" widget="handle"/>
@@ -215,10 +248,10 @@
                                        readonly="1" widget="text"/>
                             </group>
                             <div class="mt-2">
-                                <a href="https://validator.schema.org/" target="_blank"
-                                   class="btn btn-secondary me-2">
-                                    Open Schema Markup Validator
-                                </a>
+                                <button string="Open Schema Markup Validator"
+                                        name="action_open_schema_validator"
+                                        type="object"
+                                        class="btn-secondary me-2"/>
                                 <button string="Open Google Rich Results Test"
                                         name="action_open_rich_results_test"
                                         type="object"
@@ -262,14 +295,16 @@
         <field name="name">midvex.schema.record.list</field>
         <field name="model">midvex.schema.record</field>
         <field name="arch" type="xml">
-            <list string="Schema Records" default_order="priority desc, name">
+            <list string="Page Schemas" default_order="priority desc, name">
                 <field name="name"/>
                 <field name="website_id" optional="show"/>
                 <field name="target_type"/>
                 <field name="target_url" optional="show"/>
+                <field name="render_target_summary" optional="hide"/>
                 <field name="lang_code"/>
+                <field name="schema_template_id" optional="show"/>
                 <field name="schema_type"/>
-                <field name="active" optional="hide"/>
+                <field name="active" optional="show"/>
                 <field name="validation_status"
                        decoration-success="validation_status == 'valid'"
                        decoration-warning="validation_status == 'warning'"
@@ -295,6 +330,7 @@
                 <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
                 <separator/>
                 <filter string="Valid" name="valid" domain="[('validation_status','=','valid')]"/>
+                <filter string="Needs Attention" name="needs_attention" domain="[('validation_status','in',('warning','error'))]"/>
                 <filter string="Errors" name="errors" domain="[('validation_status','=','error')]"/>
                 <filter string="Warnings" name="warnings" domain="[('validation_status','=','warning')]"/>
                 <separator/>
@@ -313,15 +349,30 @@
 
     <!-- ── Action ──────────────────────────────────────────────────────── -->
     <record id="action_midvex_schema_record" model="ir.actions.act_window">
-        <field name="name">Schema Records</field>
+        <field name="name">Page Schemas</field>
         <field name="res_model">midvex.schema.record</field>
         <field name="view_mode">list,form</field>
-        <field name="context">{'search_default_active': 1}</field>
+        <field name="context">{'search_default_active': 1, 'default_target_type': 'page'}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                No schema records yet.
+                Create Page Schema
             </p>
-            <p>Create a schema record to inject JSON-LD structured data into a specific page or URL.</p>
+            <p>Use Global Website Schema for Organization/WebSite schema. Use Page Schemas to add Product, FAQ, Breadcrumb, Article, Service or other JSON-LD schema to a specific website page or URL.</p>
+            <p>Start by selecting a template, then choose Website Page or Custom URL and fill the required fields.</p>
+        </field>
+    </record>
+
+    <record id="action_midvex_schema_dashboard" model="ir.actions.act_window">
+        <field name="name">Structured Data Dashboard</field>
+        <field name="res_model">midvex.schema.record</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active': 1, 'default_target_type': 'page'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Structured Data Dashboard
+            </p>
+            <p>Use Global Website Schema for Organization/WebSite schema. Use Page Schemas to add Product, FAQ, Breadcrumb, Article, Service or other JSON-LD schema to a specific website page or URL.</p>
+            <p>Quick paths: Global Website Schema, Create Page Schema, Page Schemas, Template Library, Validation Issues, Documentation / How to Use.</p>
         </field>
     </record>
 

@@ -5,30 +5,47 @@
     <menuitem id="menu_midvex_structured_data_root"
               name="Structured Data"
               parent="website.menu_website_configuration"
-              sequence="95"/>
+              sequence="95"
+              groups="midvex_schema_manager.group_midvex_schema_manager"/>
 
-    <!-- Global Settings -->
-    <menuitem id="menu_midvex_schema_settings"
-              name="Global Settings"
+    <!-- Dashboard -->
+    <menuitem id="menu_midvex_schema_dashboard"
+              name="Dashboard"
               parent="menu_midvex_structured_data_root"
-              action="action_midvex_schema_settings"
+              action="action_midvex_schema_dashboard"
               sequence="1"
               groups="midvex_schema_manager.group_midvex_schema_manager"/>
 
-    <!-- Schema Records -->
+    <!-- Global Website Schema -->
+    <menuitem id="menu_midvex_schema_settings"
+              name="Global Website Schema"
+              parent="menu_midvex_structured_data_root"
+              action="action_midvex_schema_settings"
+              sequence="2"
+              groups="midvex_schema_manager.group_midvex_schema_manager"/>
+
+    <!-- Create Page Schema Wizard -->
+    <menuitem id="menu_midvex_schema_create_page"
+              name="Create Page Schema"
+              parent="menu_midvex_structured_data_root"
+              action="action_midvex_schema_page_wizard"
+              sequence="3"
+              groups="midvex_schema_manager.group_midvex_schema_manager"/>
+
+    <!-- Page Schemas -->
     <menuitem id="menu_midvex_schema_records"
-              name="Schema Records"
+              name="Page Schemas"
               parent="menu_midvex_structured_data_root"
               action="action_midvex_schema_record"
-              sequence="2"
-              groups="midvex_schema_manager.group_midvex_schema_user"/>
+              sequence="4"
+              groups="midvex_schema_manager.group_midvex_schema_manager"/>
 
-    <!-- Schema Templates -->
+    <!-- Template Library -->
     <menuitem id="menu_midvex_schema_templates"
-              name="Schema Templates"
+              name="Template Library"
               parent="menu_midvex_structured_data_root"
               action="action_midvex_schema_template"
-              sequence="3"
-              groups="midvex_schema_manager.group_midvex_schema_user"/>
+              sequence="5"
+              groups="midvex_schema_manager.group_midvex_schema_manager"/>
 
 </odoo>

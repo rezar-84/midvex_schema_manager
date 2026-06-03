@@ -6,7 +6,7 @@
         <field name="name">midvex.schema.settings.form</field>
         <field name="model">midvex.schema.settings</field>
         <field name="arch" type="xml">
-            <form string="Global Schema Settings">
+            <form string="Global Website Schema">
                 <sheet>
                     <div class="oe_title">
                         <h1>
@@ -107,7 +107,7 @@
 
     <!-- ── Action ──────────────────────────────────────────────────────── -->
     <record id="action_midvex_schema_settings" model="ir.actions.act_window">
-        <field name="name">Global Settings</field>
+        <field name="name">Global Website Schema</field>
         <field name="res_model">midvex.schema.settings</field>
         <field name="view_mode">list,form</field>
         <field name="help" type="html">

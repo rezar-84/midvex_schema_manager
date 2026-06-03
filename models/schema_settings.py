@@ -6,7 +6,7 @@ from .json_utils import _build_jsonld_script
 
 class MidvexSchemaSettings(models.Model):
     _name = 'midvex.schema.settings'
-    _description = 'Midvex Schema Global Settings'
+    _description = 'Midvex Global Website Schema Settings'
     _rec_name = 'organization_name'
     _order = 'website_id'
 
@@ -151,7 +151,7 @@ class MidvexSchemaSettings(models.Model):
                 '@type': 'SearchAction',
                 'target': {
                     '@type': 'EntryPoint',
-                    'urlTemplate': base + '/search?q={search_term_string}',
+                    'urlTemplate': base + '/website/search?search={search_term_string}',
                 },
                 'query-input': 'required name=search_term_string',
             }
@@ -161,6 +161,40 @@ class MidvexSchemaSettings(models.Model):
     # ------------------------------------------------------------------
     # Frontend rendering (read-only — no database writes)
     # ------------------------------------------------------------------
+
+    def _build_global_graph_data(self, website, lang_code=None):
+        self.ensure_one()
+        base_url = self._get_base_url(website)
+        graph = []
+
+        org_data = self.generate_organization_json()
+        org_data.pop('@context', None)
+        if base_url:
+            org_data['@id'] = base_url + '/#organization'
+        graph.append(org_data)
+
+        if self.enable_website_schema:
+            web_data = self.generate_website_json()
+            web_data.pop('@context', None)
+            if base_url:
+                web_data['@id'] = base_url + '/#website'
+                web_data['publisher'] = {'@id': base_url + '/#organization'}
+            try:
+                lang_list = [
+                    {
+                        '@type': 'Language',
+                        'name': lang.name,
+                        'alternateName': lang.code.split('_')[0],
+                    }
+                    for lang in website.language_ids
+                ]
+                if lang_list:
+                    web_data['availableLanguage'] = lang_list
+            except Exception:
+                pass
+            graph.append(web_data)
+
+        return {'@context': 'https://schema.org', '@graph': graph}
 
     def _render_global_for_website(self, website, lang_code):
         """
@@ -177,42 +211,7 @@ class MidvexSchemaSettings(models.Model):
         if not settings:
             return []
 
-        base_url = settings._get_base_url(website)
-        graph = []
-
-        # ── Organization node ─────────────────────────────────────────
-        org_data = settings.generate_organization_json()
-        org_data.pop('@context', None)
-        if base_url:
-            org_data['@id'] = base_url + '/#organization'
-        graph.append(org_data)
-
-        # ── WebSite node ──────────────────────────────────────────────
-        if settings.enable_website_schema:
-            web_data = settings.generate_website_json()
-            web_data.pop('@context', None)
-            if base_url:
-                web_data['@id'] = base_url + '/#website'
-                web_data['publisher'] = {'@id': base_url + '/#organization'}
-
-            # availableLanguage from Odoo website language configuration
-            try:
-                lang_list = [
-                    {
-                        '@type': 'Language',
-                        'name': lang.name,
-                        'alternateName': lang.code.split('_')[0],
-                    }
-                    for lang in website.language_ids
-                ]
-                if lang_list:
-                    web_data['availableLanguage'] = lang_list
-            except Exception:
-                pass
-
-            graph.append(web_data)
-
-        return [_build_jsonld_script({'@context': 'https://schema.org', '@graph': graph})]
+        return [_build_jsonld_script(settings._build_global_graph_data(website, lang_code))]
 
     # ------------------------------------------------------------------
     # Backend preview
@@ -220,19 +219,12 @@ class MidvexSchemaSettings(models.Model):
 
     def _compute_global_schema_preview(self):
         for rec in self:
-            parts = []
             if rec.enable_global_schema:
                 try:
-                    parts.append(json.dumps(
-                        rec.generate_organization_json(), ensure_ascii=False, indent=2
-                    ))
+                    rec.global_schema_preview = json.dumps(
+                        rec._build_global_graph_data(rec.website_id), ensure_ascii=False, indent=2
+                    )
+                    continue
                 except Exception:
                     pass
-            if rec.enable_website_schema:
-                try:
-                    parts.append(json.dumps(
-                        rec.generate_website_json(), ensure_ascii=False, indent=2
-                    ))
-                except Exception:
-                    pass
-            rec.global_schema_preview = '\n\n'.join(parts) if parts else 'No global schemas enabled.'
+            rec.global_schema_preview = 'No global schemas enabled.'

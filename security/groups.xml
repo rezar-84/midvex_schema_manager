@@ -8,7 +8,7 @@
           privilege_id— Many2one res.groups.privilege (replaces 'category_id')
         Removed in Odoo 17-19: category_id, users (renamed), website publisher groups
     -->
-    <data noupdate="1">
+    <data>
         <!-- Read-only access to all midvex.schema.* models -->
         <record id="group_midvex_schema_user" model="res.groups">
             <field name="name">Schema User</field>
@@ -18,7 +18,7 @@
         <!-- Full CRUD access; admin is added automatically -->
         <record id="group_midvex_schema_manager" model="res.groups">
             <field name="name">Schema Manager</field>
-            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('midvex_schema_manager.group_midvex_schema_user'))]"/>
             <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
         </record>
     </data>

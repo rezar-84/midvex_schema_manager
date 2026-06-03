@@ -42,6 +42,7 @@ Features:
         'views/schema_template_views.xml',
         'views/schema_record_views.xml',
         'views/schema_lang_wizard_views.xml',
+        'views/schema_page_wizard_views.xml',
         'views/schema_menu.xml',
         # 4. Website frontend injection (last — extends website.layout)
         'views/schema_website_injection.xml',

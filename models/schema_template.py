@@ -24,6 +24,17 @@ class MidvexSchemaTemplate(models.Model):
     sequence = fields.Integer('Sequence', default=10)
     is_system_template = fields.Boolean('System Template', default=False,
                                          help='System templates cannot be deleted')
+    required_field_count = fields.Integer(
+        'Required Fields', compute='_compute_field_counts', store=False
+    )
+    optional_field_count = fields.Integer(
+        'Optional Fields', compute='_compute_field_counts', store=False
+    )
+
+    def _compute_field_counts(self):
+        for rec in self:
+            rec.required_field_count = len(rec.get_required_fields())
+            rec.optional_field_count = len(rec.get_optional_fields())
 
     def get_default_structure(self):
         self.ensure_one()
@@ -86,3 +97,34 @@ class MidvexSchemaTemplate(models.Model):
                     f'System template "{rec.name}" cannot be deleted. Deactivate it instead.'
                 )
         return super().unlink()
+
+    def action_duplicate_template(self):
+        self.ensure_one()
+        new_template = self.copy({
+            'name': '%s (Copy)' % self.name,
+            'is_system_template': False,
+        })
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Template Library',
+            'res_model': 'midvex.schema.template',
+            'view_mode': 'form',
+            'res_id': new_template.id,
+            'target': 'current',
+        }
+
+    def action_use_template(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Create Page Schema',
+            'res_model': 'midvex.schema.record',
+            'view_mode': 'form',
+            'target': 'current',
+            'context': {
+                'default_schema_template_id': self.id,
+                'default_schema_type': self.schema_type,
+                'default_target_type': 'page',
+                'default_name': self.name,
+            },
+        }

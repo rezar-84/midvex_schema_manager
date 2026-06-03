@@ -26,6 +26,13 @@ class TestSchemaSettings(TransactionCase):
         data = self.settings.generate_website_json()
         self.assertEqual(data['@type'], 'WebSite')
 
+    def test_search_action_uses_odoo_search_route(self):
+        self.settings.enable_search_action = True
+        data = self.settings.generate_website_json()
+        target = data['potentialAction']['target']['urlTemplate']
+        self.assertIn('/website/search?search={search_term_string}', target)
+        self.assertNotIn('/search?q=', target)
+
     def test_render_global_returns_graph(self):
         scripts = self.settings._render_global_for_website(self.website, 'en')
         self.assertEqual(len(scripts), 1)
@@ -38,6 +45,12 @@ class TestSchemaSettings(TransactionCase):
         self.assertIn('#organization', script_text)
         self.assertIn('#website', script_text)
         self.assertIn('publisher', script_text)
+
+    def test_preview_matches_global_graph_shape(self):
+        self.settings._compute_global_schema_preview()
+        self.assertIn('@graph', self.settings.global_schema_preview)
+        self.assertIn('#organization', self.settings.global_schema_preview)
+        self.assertIn('publisher', self.settings.global_schema_preview)
 
     def test_render_global_disabled(self):
         self.settings.enable_global_schema = False

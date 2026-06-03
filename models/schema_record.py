@@ -91,6 +91,27 @@ def _to_relative_path(url_or_path):
     return url_or_path
 
 
+def _infer_schema_field_type(field_key):
+    key = (field_key or '').lower()
+    last_part = key.split('.')[-1]
+    if any(token in key for token in ('sameas', 'itemlistelement', 'availablelanguage')):
+        return 'json'
+    if any(token in last_part for token in ('url', 'image', 'logo')) or last_part in ('@id', 'id'):
+        return 'url'
+    if any(token in key for token in ('description', 'text', 'answer')):
+        return 'text'
+    if any(token in key for token in ('price', 'rating', 'latitude', 'longitude')):
+        return 'float'
+    if any(token in key for token in ('numberofitems', 'position', 'count')):
+        return 'integer'
+    return 'char'
+
+
+def _schema_field_label(field_key):
+    label = (field_key or '').replace('@', '').replace('.', ' / ').replace('_', ' ')
+    return label.title()
+
+
 # ---------------------------------------------------------------------------
 # P7 — Nested dot-path helpers
 # ---------------------------------------------------------------------------
@@ -150,11 +171,12 @@ class MidvexSchemaRecord(models.Model):
         'website.page', string='Website Page', ondelete='set null'
     )
     target_url = fields.Char('Target URL / Path',
-                              help='Absolute path, e.g. /about or https://example.com/about')
+                              help='Use /page-url, /tr/page-url, or a full https://example.com/page-url URL.')
     lang_code = fields.Char('Language Code', required=True, default='en',
                              help='BCP 47 code, e.g. en, no, de')
     schema_template_id = fields.Many2one(
-        'midvex.schema.template', string='Schema Template', ondelete='set null'
+        'midvex.schema.template', string='Schema Template', ondelete='set null',
+        help='Start by selecting a schema template, such as Product, FAQPage, BreadcrumbList, Article, or Service.'
     )
     schema_type = fields.Char('Schema Type', required=True,
                                help='e.g. Organization, Product, FAQPage, BreadcrumbList')
@@ -175,6 +197,12 @@ class MidvexSchemaRecord(models.Model):
     priority = fields.Integer('Priority', default=10,
                                help='Higher value = rendered earlier in <head>')
     last_generated_at = fields.Datetime('Last Generated', readonly=True)
+    resolved_url_preview = fields.Char(
+        'Resolved URL Preview', compute='_compute_target_display', store=False
+    )
+    render_target_summary = fields.Char(
+        'Render Target', compute='_compute_target_display', store=False
+    )
 
     field_value_ids = fields.One2many(
         'midvex.schema.field.value', 'schema_record_id', string='Field Values'
@@ -196,6 +224,26 @@ class MidvexSchemaRecord(models.Model):
             'A schema record with the same website, URL, language and type already exists.',
         ),
     ]
+
+    @api.depends('target_type', 'website_id', 'website_page_id', 'target_url')
+    def _compute_target_display(self):
+        for rec in self:
+            base = ''
+            if rec.website_id:
+                domain = (getattr(rec.website_id, 'domain', '') or '').strip()
+                if domain:
+                    base = domain.rstrip('/') if domain.startswith('http') else 'https://' + domain.rstrip('/')
+            path = rec.target_url or ''
+            if rec.target_type == 'global':
+                rec.render_target_summary = 'All pages on %s' % (rec.website_id.name or 'this website')
+                rec.resolved_url_preview = base or ''
+            elif rec.target_type == 'page':
+                page_name = rec.website_page_id.display_name if rec.website_page_id else 'No page selected'
+                rec.render_target_summary = 'Website Page: %s' % page_name
+                rec.resolved_url_preview = path if _URL_RE.match(path or '') else (base + path if base and path else path)
+            else:
+                rec.render_target_summary = 'Custom URL: %s' % (path or 'No URL set')
+                rec.resolved_url_preview = path if _URL_RE.match(path or '') else (base + path if base and path else path)
 
     # ------------------------------------------------------------------
     # Constraints
@@ -412,6 +460,17 @@ class MidvexSchemaRecord(models.Model):
                     if not _get_nested_value(data, req):
                         warnings.append(f'{self.schema_type}: "{req}" is recommended.')
 
+            if self.target_type == 'global' and self.schema_type in ('Organization', 'WebSite'):
+                settings = self.env['midvex.schema.settings'].search([
+                    ('website_id', '=', self.website_id.id),
+                    ('enable_global_schema', '=', True),
+                ], limit=1)
+                if settings:
+                    warnings.append(
+                        'Global Website Schema is enabled for this website. Avoid duplicate global %s schema unless you have a specific reason.'
+                        % self.schema_type
+                    )
+
         dup = self.check_duplicate_schema()
         if dup:
             warnings.append(dup)
@@ -472,6 +531,13 @@ class MidvexSchemaRecord(models.Model):
             'target': 'new',
         }
 
+    def action_open_schema_validator(self):
+        return {
+            'type': 'ir.actions.act_url',
+            'url': 'https://validator.schema.org/',
+            'target': 'new',
+        }
+
     def action_open_lang_wizard(self):
         self.ensure_one()
         return {
@@ -510,22 +576,62 @@ class MidvexSchemaRecord(models.Model):
         for field_key, value in candidates.items():
             if not value:
                 continue
-            field_type = 'url' if field_key in ('url', 'image') else 'char'
+            field_type = _infer_schema_field_type(field_key)
             existing = self.field_value_ids.filtered(lambda v: v.field_key == field_key)
             if existing:
-                existing[0].write(
-                    {'value_url': value} if field_type == 'url' else {'value_char': value}
-                )
+                if field_type == 'url':
+                    existing[0].write({'value_url': value})
+                elif field_type == 'text':
+                    existing[0].write({'value_text': value})
+                else:
+                    existing[0].write({'value_char': value, 'field_type': 'char'})
             else:
                 self.env['midvex.schema.field.value'].create({
                     'schema_record_id': self.id,
                     'field_key': field_key,
-                    'field_label': field_key.replace('_', ' ').title(),
+                    'field_label': _schema_field_label(field_key),
                     'field_type': field_type,
                     'value_char': value if field_type == 'char' else False,
+                    'value_text': value if field_type == 'text' else False,
                     'value_url': value if field_type == 'url' else False,
                     'lang_code': self.lang_code,
                 })
+        return True
+
+    def action_add_required_fields(self):
+        for record in self:
+            record._add_template_fields(required=True, optional=False)
+        return True
+
+    def action_add_optional_fields(self):
+        for record in self:
+            record._add_template_fields(required=False, optional=True)
+        return True
+
+    def action_suggest_breadcrumbs(self):
+        for record in self:
+            crumbs = record.suggest_breadcrumbs_from_url(record.target_url or '/')
+            record.breadcrumb_item_ids = [(5, 0, 0)] + [
+                (0, 0, {
+                    'position': index,
+                    'name': crumb['name'],
+                    'url': crumb['url'],
+                    'lang_code': record.lang_code,
+                })
+                for index, crumb in enumerate(crumbs, start=1)
+            ]
+        return True
+
+    def action_add_sample_faq(self):
+        for record in self:
+            if not record.faq_item_ids:
+                record.faq_item_ids = [(0, 0, {
+                    'position': 1,
+                    'question': 'Sample question',
+                    'answer': 'Replace this answer with FAQ content that is visible on the page.',
+                    'lang_code': record.lang_code,
+                    'active': True,
+                })]
         return True
 
     # ------------------------------------------------------------------
@@ -540,7 +646,7 @@ class MidvexSchemaRecord(models.Model):
         Contract:
         - MUST NOT write to any database record.
         - Returns Markup (safe HTML) of all applicable <script> tags.
-        - Global Settings Organization/WebSite schema is rendered first.
+        - Global Website Schema Organization/WebSite schema is rendered first.
         - Page/URL-specific records follow, sorted by priority desc.
         """
         try:
@@ -571,7 +677,7 @@ class MidvexSchemaRecord(models.Model):
 
         parts = []
 
-        # ── 1. Global Settings: Organization + WebSite @graph ─────────
+        # ── 1. Global Website Schema: Organization + WebSite @graph ───
         try:
             settings_parts = (
                 self.env['midvex.schema.settings']
@@ -595,10 +701,16 @@ class MidvexSchemaRecord(models.Model):
             base_domain + [('target_type', '=', 'global')]
         )
 
-        # Page matching: use normalized path
-        matching_pages = self.env['website.page'].sudo().search(
-            [('url', '=', current_path)]
-        )
+        base_url = ''
+        domain = (getattr(website, 'domain', '') or '').strip()
+        if domain:
+            base_url = domain.rstrip('/') if domain.startswith('http') else 'https://' + domain.rstrip('/')
+
+        # Page matching: use normalized path, scoped by website when supported
+        page_domain = [('url', 'in', list({current_path, raw_path} - {''}))]
+        if 'website_id' in self.env['website.page']._fields:
+            page_domain.append(('website_id', 'in', [False, website.id]))
+        matching_pages = self.env['website.page'].sudo().search(page_domain)
         page_records = self.sudo().search(
             base_domain + [
                 ('target_type', '=', 'page'),
@@ -606,12 +718,14 @@ class MidvexSchemaRecord(models.Model):
             ]
         )
 
-        # URL matching: try normalized path, raw path, and relative-from-absolute target
-        url_search_paths = list({
-            current_path,
-            raw_path,
-            _to_relative_path(current_path),
-        } - {''})
+        # URL matching: raw/normalized relative paths and absolute equivalents
+        url_candidates = {current_path, raw_path, _to_relative_path(current_path)}
+        if base_url:
+            url_candidates.update({
+                base_url + current_path if current_path else '',
+                base_url + raw_path if raw_path else '',
+            })
+        url_search_paths = list(url_candidates - {''})
         url_records = self.sudo().search(
             base_domain + [
                 ('target_type', '=', 'url'),
@@ -644,7 +758,7 @@ class MidvexSchemaRecord(models.Model):
     def suggest_breadcrumbs_from_url(self, url):
         if not url:
             return []
-        path = url.split('?')[0].rstrip('/')
+        path = _to_relative_path(url).split('?')[0].rstrip('/')
         parts = [p for p in path.split('/') if p]
         crumbs = [{'name': 'Home', 'url': '/'}]
         accumulated = ''
@@ -671,28 +785,65 @@ class MidvexSchemaRecord(models.Model):
             domain.append(('target_type', '=', 'global'))
 
         duplicates = self.search(domain)
+        warnings = []
         if duplicates:
             names = ', '.join(duplicates.mapped('name'))
-            return f'Possible duplicate schema found: {names}'
-        return ''
+            warnings.append(f'Possible duplicate schema found: {names}')
+        if self.target_type == 'global' and self.schema_type in ('Organization', 'WebSite'):
+            settings = self.env['midvex.schema.settings'].search([
+                ('website_id', '=', self.website_id.id),
+                ('enable_global_schema', '=', True),
+            ], limit=1)
+            if settings:
+                warnings.append(
+                    'Global Website Schema already renders Organization/WebSite data for this website.'
+                )
+        return '\n'.join(warnings)
 
     @api.onchange('schema_template_id')
     def _onchange_schema_template_id(self):
         if not self.schema_template_id:
             return
         self.schema_type = self.schema_template_id.schema_type
-        self.field_value_ids = [(5, 0, 0)]
-        required_fields = self.schema_template_id.get_required_fields()
-        new_lines = []
-        for field_key in required_fields:
-            field_type = 'url' if field_key in ('url', 'image', 'logo') else 'char'
-            new_lines.append((0, 0, {
+        self.field_value_ids = [(5, 0, 0)] + self._prepare_template_field_commands(required=True, optional=False)
+
+    @api.onchange('website_page_id')
+    def _onchange_website_page_id(self):
+        if self.website_page_id and not self.target_url:
+            self.target_url = self.website_page_id.url
+
+    def _prepare_template_field_commands(self, required=True, optional=False):
+        self.ensure_one()
+        if not self.schema_template_id:
+            return []
+        field_keys = []
+        required_keys = set(self.schema_template_id.get_required_fields()) if required else set()
+        if required:
+            field_keys.extend(self.schema_template_id.get_required_fields())
+        if optional:
+            field_keys.extend(self.schema_template_id.get_optional_fields())
+
+        existing_keys = set(self.field_value_ids.mapped('field_key'))
+        commands = []
+        sequence = 10
+        for field_key in field_keys:
+            if field_key in existing_keys:
+                continue
+            commands.append((0, 0, {
                 'field_key': field_key,
-                'field_label': field_key.replace('_', ' ').title(),
-                'field_type': field_type,
-                'required': True,
+                'field_label': _schema_field_label(field_key),
+                'field_type': _infer_schema_field_type(field_key),
+                'required': field_key in required_keys,
+                'sequence': sequence,
             }))
-        self.field_value_ids = new_lines
+            sequence += 10
+        return commands
+
+    def _add_template_fields(self, required=True, optional=False):
+        self.ensure_one()
+        commands = self._prepare_template_field_commands(required=required, optional=optional)
+        if commands:
+            self.write({'field_value_ids': commands})
 
     @api.model
     def regenerate_all_active_schemas(self):
@@ -715,8 +866,15 @@ class MidvexSchemaRecord(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        for vals in vals_list:
+            template_id = vals.get('schema_template_id')
+            if template_id and not vals.get('schema_type'):
+                template = self.env['midvex.schema.template'].browse(template_id)
+                vals['schema_type'] = template.schema_type
         records = super().create(vals_list)
         for record in records:
+            if record.schema_template_id and not record.field_value_ids:
+                record._add_template_fields(required=True, optional=False)
             warning = record.check_duplicate_schema()
             if warning:
                 super(MidvexSchemaRecord, record).write({'duplicate_warning': warning})

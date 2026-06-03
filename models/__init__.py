@@ -5,3 +5,4 @@ from . import schema_faq_item
 from . import schema_breadcrumb_item
 from . import schema_record
 from . import schema_lang_wizard
+from . import schema_page_wizard

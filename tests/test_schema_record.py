@@ -156,6 +156,32 @@ class TestSchemaRecord(TransactionCase):
         status = bc.validate_schema()
         self.assertEqual(status, 'error')
 
+    def test_template_first_creation_sets_type_and_required_fields(self):
+        template = self.env.ref('midvex_schema_manager.schema_template_product')
+        record = self.env['midvex.schema.record'].create({
+            'name': 'Template First Product',
+            'website_id': self.website.id,
+            'target_type': 'url',
+            'target_url': '/template-first-product',
+            'lang_code': 'en',
+            'schema_template_id': template.id,
+        })
+        self.assertEqual(record.schema_type, 'Product')
+        required_keys = set(record.field_value_ids.filtered('required').mapped('field_key'))
+        self.assertTrue({'name', 'description', 'image'}.issubset(required_keys))
+
+    def test_breadcrumb_suggestion_from_url(self):
+        crumbs = self.env['midvex.schema.record'].suggest_breadcrumbs_from_url(
+            'https://example.com/products/sample-page?x=1'
+        )
+        self.assertEqual(crumbs[0], {'name': 'Home', 'url': '/'})
+        self.assertEqual(crumbs[-1], {'name': 'Sample Page', 'url': '/products/sample-page'})
+
+    def test_schema_manager_implies_schema_user(self):
+        manager = self.env.ref('midvex_schema_manager.group_midvex_schema_manager')
+        user = self.env.ref('midvex_schema_manager.group_midvex_schema_user')
+        self.assertIn(user, manager.implied_ids)
+
     # --- P10: duplicate prevention ---
 
     def test_duplicate_detection(self):

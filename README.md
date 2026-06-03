@@ -34,9 +34,9 @@ It **complements** Odoo's native SEO tools (meta title, description, keywords) b
 
 ## Configuration
 
-### Step 1 — Global Settings (recommended first)
+### Step 1 — Global Website Schema (recommended first)
 
-Navigate to **Website → Configuration → Structured Data → Global Settings**.
+Navigate to **Website → Configuration → Structured Data → Global Website Schema**.
 
 Create one settings record per website and fill in:
 
@@ -61,20 +61,23 @@ Assign users to groups via **Settings → Users & Companies → Groups**:
 
 ---
 
-## Creating Your First Schema Record
+## Creating Your First Page Schema
 
-1. Go to **Website → Configuration → Structured Data → Schema Records**.
+1. Go to **Website → Configuration → Structured Data → Page Schemas** or **Create Page Schema**.
 2. Click **New**.
-3. Set **Schema Type** (e.g. `Product`) and select a **Schema Template**.
-   - The template onchange auto-populates required field rows.
+3. Select **Schema Template** first, for example `Product`, `FAQPage`, `BreadcrumbList`, `Article`, or `Service`.
+   - Schema Type is filled automatically from the template.
+   - Required field rows are created automatically.
 4. Choose **Target Type**:
-   - `Global` — injected on every page
-   - `Website Page` — select a specific page from the dropdown
-   - `Custom URL` — enter a path like `/about`
+   - `Global` — rendered on every page. Use rarely; Organization/WebSite is usually handled by Global Website Schema.
+   - `Website Page` — select a specific Odoo website page. The target URL is suggested from the page URL.
+   - `Custom URL` — enter `/about`, `/tr/about`, or `https://example.com/about`.
 5. Set **Language Code** (e.g. `en`, `no`, `de`).
-6. Fill in the **Fields** tab with values.
+6. Fill in the **Fields** tab with values, or add FAQ/Breadcrumb items when using those templates.
 7. Click **Validate** to run the internal validator.
 8. The record is injected on the next page load when **Active** is checked.
+
+The form shows a resolved URL preview and a validation banner near the top so you can see where the schema renders and whether it needs attention.
 
 ---
 
@@ -112,7 +115,7 @@ returns only records matching the current language.
 
 ### External Tools
 
-Buttons on the **Validation** tab:
+Buttons on the form:
 - **Open Schema Markup Validator** → [validator.schema.org](https://validator.schema.org/)
 - **Open Google Rich Results Test** → pre-filled with the record's target URL
 
@@ -142,10 +145,20 @@ Buttons on the **Validation** tab:
 | 11 | CollectionPage | Category / listing pages |
 | 12 | ItemList | Carousel-eligible lists |
 
+Open **Website → Configuration → Structured Data → Template Library** to browse templates in a kanban library. Each card shows the schema type, description, required field count, and whether the template is system or custom.
+
+Use **Use This Template** to create a new Page Schema with the template preselected. Use **Duplicate Template** to create an editable custom copy.
+
 ### Custom Templates
 
-Go to **Schema Templates** and click **New** or **Duplicate** an existing template.
+Go to **Template Library** and click **New** or **Duplicate Template** on an existing template.
 Custom templates can be freely edited, exported (copy JSON), or deactivated.
+
+## FAQPage and BreadcrumbList
+
+FAQPage schema is manually managed. Add FAQ items only when the same questions and answers are visible on the target page; validation fails until at least one active FAQ item exists.
+
+BreadcrumbList schema has editable breadcrumb lines. Use **Suggest Breadcrumbs from URL** to create Home plus one item per URL segment, then adjust names and URLs as needed. Validation warns when positions are not sequential.
 
 ---
 
@@ -177,11 +190,25 @@ Custom templates can be freely edited, exported (copy JSON), or deactivated.
 ### render_schema_for_request Logic
 
 1. Resolve current `website` and `lang_code` from `request`.
-2. Fetch active global records for this website + language.
-3. Match page records by `website.page.url == request.httprequest.path`.
-4. Match URL records by `target_url == request.httprequest.path`.
-5. Sort all matched records by `priority desc`, call `render_html()` on each.
-6. Return concatenated `Markup` string.
+2. Render Global Website Schema first as one `@graph` script when enabled.
+3. Fetch active global Page Schema records for this website + language.
+4. Match page records by raw path and language-normalized path, scoped to `website_id` when `website.page` supports it.
+5. Match URL records by raw path, normalized path, absolute raw URL, and absolute normalized URL.
+6. Sort all matched records by `priority desc`.
+7. Call `build_schema_data()` and `_build_jsonld_script()` for each record.
+8. Return concatenated `Markup` string.
+
+The public request path never calls `generate_json()` or `render_html()` and does not write to the database.
+
+### Global Website Schema
+
+Global settings render Organization and WebSite nodes first in an `@graph`. The frontend output and backend preview use the same graph builder and include `@id`, `publisher`, and `availableLanguage` where configuration is available.
+
+When SearchAction is enabled, the route is Odoo's website search route:
+
+```text
+/website/search?search={search_term_string}
+```
 
 ### JSON Safety
 
