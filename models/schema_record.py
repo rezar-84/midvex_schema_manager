@@ -94,20 +94,22 @@ def _to_relative_path(url_or_path):
 def _infer_schema_field_type(field_key):
     key = (field_key or '').lower()
     last_part = key.split('.')[-1]
-    if any(token in key for token in ('sameas', 'itemlistelement', 'availablelanguage')):
+    if key in ('sameas', 'itemlistelement', 'availablelanguage', 'haspart'):
         return 'json'
     if any(token in last_part for token in ('url', 'image', 'logo')) or last_part in ('@id', 'id'):
         return 'url'
-    if any(token in key for token in ('description', 'text', 'answer')):
+    if any(token in key for token in ('description', 'text', 'answer', 'articlebody')):
         return 'text'
-    if any(token in key for token in ('price', 'rating', 'latitude', 'longitude')):
+    if any(token in key for token in ('price', 'ratingvalue', 'latitude', 'longitude')):
         return 'float'
-    if any(token in key for token in ('numberofitems', 'position', 'count')):
+    if any(token in key for token in ('numberofitems', 'reviewcount', 'position', 'count')):
         return 'integer'
     return 'char'
 
 
 def _schema_field_label(field_key):
+    if field_key == 'url':
+        return 'Schema URL / Canonical URL'
     label = (field_key or '').replace('@', '').replace('.', ' / ').replace('_', ' ')
     return label.title()
 
@@ -170,10 +172,12 @@ class MidvexSchemaRecord(models.Model):
     website_page_id = fields.Many2one(
         'website.page', string='Website Page', ondelete='set null'
     )
-    target_url = fields.Char('Target URL / Path',
-                              help='Use /page-url, /tr/page-url, or a full https://example.com/page-url URL.')
+    target_url = fields.Char(
+        'Render URL / Target URL',
+        help='This controls where the schema is rendered. Use /page-url, /tr/page-url, or a full https://example.com/page-url URL.',
+    )
     lang_code = fields.Char('Language Code', required=True, default='en',
-                             help='BCP 47 code, e.g. en, no, de')
+                             help='This schema record renders only for this website language. Use a BCP 47 code such as en, no, or de.')
     schema_template_id = fields.Many2one(
         'midvex.schema.template', string='Schema Template', ondelete='set null',
         help='Start by selecting a schema template, such as Product, FAQPage, BreadcrumbList, Article, or Service.'
@@ -273,7 +277,7 @@ class MidvexSchemaRecord(models.Model):
                     f'already exists for this target.'
                 )
 
-    @api.constrains('manual_json')
+    @api.constrains('manual_json_enabled', 'manual_json')
     def _check_manual_json(self):
         for rec in self:
             if rec.manual_json_enabled and rec.manual_json:
@@ -356,6 +360,8 @@ class MidvexSchemaRecord(models.Model):
         Backend methods (generate_json, render_html) call this internally too.
         """
         self.ensure_one()
+        if self.manual_json_enabled and not self.manual_json:
+            return None
         if self.manual_json_enabled and self.manual_json:
             try:
                 # Re-parse: ensures no raw string injection escapes json.loads
@@ -403,7 +409,9 @@ class MidvexSchemaRecord(models.Model):
 
         data = self.build_schema_data()
 
-        if not isinstance(data, dict):
+        if self.manual_json_enabled and not self.manual_json:
+            errors.append('Manual JSON override is enabled, but Manual JSON is empty.')
+        elif not isinstance(data, dict):
             errors.append('Schema must be a JSON object.')
         else:
             if '@context' not in data:
@@ -459,6 +467,11 @@ class MidvexSchemaRecord(models.Model):
                 for req in ('name', 'url'):
                     if not _get_nested_value(data, req):
                         warnings.append(f'{self.schema_type}: "{req}" is recommended.')
+                if self.target_type == 'url':
+                    warnings.append(
+                        '%s schema is normally global. Use Target Type = Global unless this is an intentional advanced override.'
+                        % self.schema_type
+                    )
 
             if self.target_type == 'global' and self.schema_type in ('Organization', 'WebSite'):
                 settings = self.env['midvex.schema.settings'].search([
@@ -624,14 +637,14 @@ class MidvexSchemaRecord(models.Model):
 
     def action_add_sample_faq(self):
         for record in self:
-            if not record.faq_item_ids:
-                record.faq_item_ids = [(0, 0, {
-                    'position': 1,
-                    'question': 'Sample question',
-                    'answer': 'Replace this answer with FAQ content that is visible on the page.',
-                    'lang_code': record.lang_code,
-                    'active': True,
-                })]
+            next_position = max(record.faq_item_ids.mapped('position') or [0]) + 1
+            record.faq_item_ids = [(0, 0, {
+                'position': next_position,
+                'question': 'New question',
+                'answer': 'Replace this answer with FAQ content that is visible on the page.',
+                'lang_code': record.lang_code,
+                'active': True,
+            })]
         return True
 
     # ------------------------------------------------------------------
@@ -805,7 +818,15 @@ class MidvexSchemaRecord(models.Model):
         if not self.schema_template_id:
             return
         self.schema_type = self.schema_template_id.schema_type
+        self.target_type = self.schema_template_id.get_recommended_target_type()
         self.field_value_ids = [(5, 0, 0)] + self._prepare_template_field_commands(required=True, optional=False)
+        if self.schema_type in ('Organization', 'WebSite') and self.target_type == 'url':
+            return {
+                'warning': {
+                    'title': 'Global schema recommended',
+                    'message': '%s is normally rendered globally. Use Custom URL only for an intentional advanced override.' % self.schema_type,
+                }
+            }
 
     @api.onchange('website_page_id')
     def _onchange_website_page_id(self):
@@ -868,19 +889,29 @@ class MidvexSchemaRecord(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             template_id = vals.get('schema_template_id')
-            if template_id and not vals.get('schema_type'):
+            if template_id:
                 template = self.env['midvex.schema.template'].browse(template_id)
-                vals['schema_type'] = template.schema_type
+                if not vals.get('schema_type'):
+                    vals['schema_type'] = template.schema_type
+                if not vals.get('target_type'):
+                    vals['target_type'] = template.get_recommended_target_type()
         records = super().create(vals_list)
         for record in records:
             if record.schema_template_id and not record.field_value_ids:
                 record._add_template_fields(required=True, optional=False)
+            if record.schema_template_id and record.target_type == 'url' and record.schema_type in ('Organization', 'WebSite'):
+                super(MidvexSchemaRecord, record).write({
+                    'duplicate_warning': '%s schema is normally global. Use Target Type = Global unless this is intentional.' % record.schema_type
+                })
             warning = record.check_duplicate_schema()
             if warning:
                 super(MidvexSchemaRecord, record).write({'duplicate_warning': warning})
         return records
 
     def write(self, vals):
+        if vals.get('schema_template_id'):
+            template = self.env['midvex.schema.template'].browse(vals['schema_template_id'])
+            vals.setdefault('schema_type', template.schema_type)
         result = super().write(vals)
         if self.env.context.get('_midvex_skip_dup_check'):
             return result

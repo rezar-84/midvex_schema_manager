@@ -63,7 +63,7 @@ Assign users to groups via **Settings → Users & Companies → Groups**:
 
 ## Creating Your First Page Schema
 
-1. Go to **Website → Configuration → Structured Data → Page Schemas** or **Create Page Schema**.
+1. Go to **Website → Configuration → Structured Data → Create Page Schema** for the guided wizard, or **Page Schemas** for the full editor.
 2. Click **New**.
 3. Select **Schema Template** first, for example `Product`, `FAQPage`, `BreadcrumbList`, `Article`, or `Service`.
    - Schema Type is filled automatically from the template.
@@ -78,6 +78,10 @@ Assign users to groups via **Settings → Users & Companies → Groups**:
 8. The record is injected on the next page load when **Active** is checked.
 
 The form shows a resolved URL preview and a validation banner near the top so you can see where the schema renders and whether it needs attention.
+
+**Render URL / Target URL** controls where the schema is rendered. A field named **Schema URL / Canonical URL** controls the `url` value inside JSON-LD. These are often the same page URL, but they are separate concepts.
+
+Language is set once on the parent Page Schema record. Child field, FAQ, and breadcrumb lines do not show language in the normal UI.
 
 ---
 
@@ -153,6 +157,7 @@ Use **Use This Template** to create a new Page Schema with the template preselec
 
 Go to **Template Library** and click **New** or **Duplicate Template** on an existing template.
 Custom templates can be freely edited, exported (copy JSON), or deactivated.
+System templates show a warning in the editor; duplicate them before making custom changes.
 
 ## FAQPage and BreadcrumbList
 
@@ -166,6 +171,7 @@ BreadcrumbList schema has editable breadcrumb lines. Use **Suggest Breadcrumbs f
 
 - Only users in **Schema Manager** group can create, edit, or publish schemas.
 - All JSON output uses `json.dumps()` exclusively — no string concatenation.
+- **Advanced JSON Override** is available only to Schema Managers. It fully replaces generated fields, FAQ items, and breadcrumbs when enabled.
 - Manual JSON override is parsed and validated before saving (`@api.constrains`).
 - Inactive schemas are never rendered.
 - Wrong-language schemas are never rendered.

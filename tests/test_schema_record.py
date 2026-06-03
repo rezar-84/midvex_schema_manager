@@ -7,6 +7,7 @@ from ..models.schema_record import (
     _set_nested_value,
     _get_nested_value,
     _to_relative_path,
+    _infer_schema_field_type,
 )
 from ..models.json_utils import _safe_json_dumps, _build_jsonld_script
 
@@ -169,6 +170,46 @@ class TestSchemaRecord(TransactionCase):
         self.assertEqual(record.schema_type, 'Product')
         required_keys = set(record.field_value_ids.filtered('required').mapped('field_key'))
         self.assertTrue({'name', 'description', 'image'}.issubset(required_keys))
+
+    def test_template_target_recommendations(self):
+        product = self.env.ref('midvex_schema_manager.schema_template_product')
+        website = self.env.ref('midvex_schema_manager.schema_template_website')
+        organization = self.env.ref('midvex_schema_manager.schema_template_organization')
+        self.assertEqual(product.get_recommended_target_type(), 'page')
+        self.assertEqual(website.get_recommended_target_type(), 'global')
+        self.assertEqual(organization.get_recommended_target_type(), 'global')
+
+    def test_add_optional_fields_does_not_duplicate_rows(self):
+        template = self.env.ref('midvex_schema_manager.schema_template_product')
+        record = self.env['midvex.schema.record'].create({
+            'name': 'Optional Fields Product',
+            'website_id': self.website.id,
+            'target_url': '/optional-fields-product',
+            'lang_code': 'en',
+            'schema_template_id': template.id,
+        })
+        record.action_add_optional_fields()
+        count_after_first = len(record.field_value_ids)
+        record.action_add_optional_fields()
+        self.assertEqual(len(record.field_value_ids), count_after_first)
+
+    def test_field_type_inference(self):
+        self.assertEqual(_infer_schema_field_type('url'), 'url')
+        self.assertEqual(_infer_schema_field_type('publisher.logo.url'), 'url')
+        self.assertEqual(_infer_schema_field_type('brand.@id'), 'url')
+        self.assertEqual(_infer_schema_field_type('articleBody'), 'text')
+        self.assertEqual(_infer_schema_field_type('ratingValue'), 'float')
+        self.assertEqual(_infer_schema_field_type('reviewCount'), 'integer')
+        self.assertEqual(_infer_schema_field_type('sameAs'), 'json')
+
+    def test_child_language_fields_hidden_from_schema_form(self):
+        view = self.env.ref('midvex_schema_manager.view_midvex_schema_record_form')
+        arch = view.arch_db
+        self.assertIn('<field name="lang_code" placeholder="en"/>', arch)
+        self.assertNotIn('<field name="lang_code" optional="show"/>', arch)
+        self.assertNotIn('<field name="field_value_ids" nolabel="1">\n                                <list editable="bottom" optional="show">\n                                    <field name="sequence" widget="handle"/>\n                                    <field name="field_label"/>\n                                    <field name="field_key"/>\n                                    <field name="field_type"/>\n                                    <field name="required"/>\n                                    <field name="lang_code"/>', arch)
+        self.assertNotIn('<field name="answer" widget="text"/>\n                                        <field name="position"/>\n                                        <field name="lang_code"/>', arch)
+        self.assertNotIn('<field name="url"/>\n                                        <field name="position"/>\n                                        <field name="lang_code"/>', arch)
 
     def test_breadcrumb_suggestion_from_url(self):
         crumbs = self.env['midvex.schema.record'].suggest_breadcrumbs_from_url(

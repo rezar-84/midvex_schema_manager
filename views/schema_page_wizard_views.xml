@@ -13,12 +13,18 @@
                     <group>
                         <group>
                             <field name="website_id"/>
-                            <field name="website_page_id"/>
-                            <field name="target_url" placeholder="/page-url or https://example.com/page-url"/>
-                        </group>
-                        <group>
                             <field name="lang_code" placeholder="en"/>
                             <field name="schema_template_id"/>
+                            <field name="target_type" widget="radio" options="{'horizontal': true}"/>
+                        </group>
+                        <group>
+                            <field name="website_page_id"
+                                   invisible="target_type != 'page'"
+                                   required="target_type == 'page'"/>
+                            <field name="target_url"
+                                   invisible="target_type == 'global'"
+                                   placeholder="/page-url or https://example.com/page-url"/>
+                            <field name="add_optional_fields"/>
                             <field name="auto_populate"/>
                         </group>
                     </group>

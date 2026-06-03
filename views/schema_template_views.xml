@@ -16,6 +16,9 @@
                             bg_color="bg-info" invisible="not is_system_template"/>
                     <widget name="web_ribbon" title="Archived"
                             bg_color="bg-danger" invisible="active"/>
+                    <div class="alert alert-warning" role="alert" invisible="not is_system_template">
+                        Duplicate this template before editing system templates.
+                    </div>
                     <div class="oe_title">
                         <label for="name"/>
                         <h1><field name="name" placeholder="Template Name"/></h1>
@@ -38,30 +41,35 @@
 
                     <notebook>
                         <page string="JSON Template" name="json_template">
+                            <div class="alert alert-info" role="alert">
+                                This is the base JSON-LD structure. Required and optional fields are generated from the field lists.
+                            </div>
                             <group string="Default JSON Structure">
                                 <field name="json_template" nolabel="1"
-                                       widget="ace"
-                                       options="{'mode': 'json'}"
-                                       placeholder='{"@context":"https://schema.org","@type":"..."}'/>
+                                       widget="text"
+                                       placeholder='{"@context":"https://schema.org","@type":"Product","name":"","url":""}'/>
                             </group>
                         </page>
                         <page string="Fields &amp; Mapping" name="fields_mapping">
+                            <div class="alert alert-info" role="alert">
+                                Use field keys such as name, url, brand.@id, offers.price, and publisher.logo.url. Dot-paths map values into nested JSON-LD objects.
+                            </div>
                             <group>
                                 <group string="Required Fields (JSON array)">
                                     <field name="required_fields_json" nolabel="1"
                                            widget="text"
-                                           placeholder='["name","url"]'/>
+                                           placeholder='["name","description","image","url"]'/>
                                 </group>
                                 <group string="Optional Fields (JSON array)">
                                     <field name="optional_fields_json" nolabel="1"
                                            widget="text"
-                                           placeholder='["description","image"]'/>
+                                           placeholder='["brand.@id","offers.price","offers.priceCurrency"]'/>
                                 </group>
                             </group>
                             <group string="Auto-fill Mapping (JSON object)">
                                 <field name="auto_mapping_json" nolabel="1"
                                        widget="text"
-                                       placeholder='{"name":"name","url":"url"}'/>
+                                       placeholder='{"name":"name","description":"description","url":"url"}'/>
                             </group>
                             <group string="Validation Rules (JSON object)">
                                 <field name="validation_rules_json" nolabel="1"
@@ -102,6 +110,7 @@
                 <field name="schema_type"/>
                 <field name="description"/>
                 <field name="required_field_count"/>
+                <field name="optional_field_count"/>
                 <field name="is_system_template"/>
                 <templates>
                     <t t-name="card">
@@ -118,7 +127,8 @@
                                 <field name="description"/>
                             </div>
                             <div class="mt-2">
-                                <span><field name="required_field_count"/> required fields</span>
+                                <span><field name="required_field_count"/> required</span>
+                                <span class="ms-2"><field name="optional_field_count"/> optional</span>
                             </div>
                             <div class="mt-3">
                                 <button name="action_use_template" type="object" string="Use This Template" class="btn btn-primary btn-sm"/>
@@ -147,7 +157,8 @@
                 <filter string="FAQ" name="faq" domain="[('schema_type','=','FAQPage')]"/>
                 <filter string="Breadcrumb" name="breadcrumb" domain="[('schema_type','=','BreadcrumbList')]"/>
                 <filter string="Article / Blog" name="article_blog" domain="[('schema_type','in',('Article','BlogPosting'))]"/>
-                <filter string="Page Types" name="page_types" domain="[('schema_type','in',('WebPage','ContactPage','AboutPage','CollectionPage'))]"/>
+                <filter string="Page" name="page" domain="[('schema_type','not in',('Organization','WebSite'))]"/>
+                <filter string="Service / Page Type" name="service_page_types" domain="[('schema_type','in',('Service','WebPage','ContactPage','AboutPage','CollectionPage'))]"/>
                 <filter string="Global" name="global_types" domain="[('schema_type','in',('Organization','WebSite'))]"/>
                 <separator/>
                 <filter string="Schema Type" name="group_by_type" context="{'group_by':'schema_type'}"/>

@@ -6,7 +6,7 @@
         <field name="name">midvex.schema.record.form</field>
         <field name="model">midvex.schema.record</field>
         <field name="arch" type="xml">
-            <form string="Schema Record">
+            <form string="Page Schema">
                 <header>
                     <button string="Validate" name="action_validate"
                             type="object" class="btn-primary"/>
@@ -62,7 +62,6 @@
                             <field name="schema_template_id"
                                    placeholder="Start with Product, FAQPage, BreadcrumbList, Article, Service..."/>
                             <field name="schema_type" readonly="schema_template_id"/>
-                            <field name="target_type" widget="radio" options="{'horizontal': true}"/>
                             <field name="website_id"/>
                             <field name="lang_code" placeholder="en"/>
                             <field name="active"/>
@@ -70,6 +69,32 @@
                         <group>
                             <field name="priority"/>
                             <field name="validation_status" readonly="1"/>
+                            <field name="auto_populate"/>
+                            <field name="duplicate_warning" readonly="1"
+                                   invisible="not duplicate_warning"/>
+                        </group>
+                    </group>
+
+                    <group string="Render Target">
+                        <div class="alert alert-info" role="alert" invisible="target_type != 'global'">
+                            Rendered on all pages. Use rarely; global Organization/WebSite is usually handled by Global Website Schema.
+                        </div>
+                        <div class="alert alert-info" role="alert" invisible="target_type != 'page'">
+                            Attach this schema to a specific Odoo website page.
+                        </div>
+                        <div class="alert alert-info" role="alert" invisible="target_type != 'url'">
+                            Render URL / Target URL controls where the schema is rendered. It is different from the Schema URL field inside JSON-LD.
+                        </div>
+                        <group>
+                            <field name="target_type" widget="radio" options="{'horizontal': true}"/>
+                            <field name="website_page_id"
+                                   invisible="target_type != 'page'"
+                                   required="target_type == 'page'"/>
+                            <field name="target_url"
+                                   invisible="target_type == 'global'"
+                                   placeholder="/page-url, /tr/page-url, or https://example.com/page-url"/>
+                        </group>
+                        <group>
                             <field name="render_target_summary" readonly="1"/>
                             <field name="resolved_url_preview" readonly="1"/>
                         </group>
@@ -77,38 +102,57 @@
 
                     <notebook>
 
-                        <!-- Tab 1 — General -->
-                        <page string="General" name="general">
-                            <group string="Target">
-                                <div class="alert alert-info" role="alert" invisible="target_type != 'global'">
-                                    Rendered on all pages. Use rarely; global Organization/WebSite is usually handled by Global Website Schema.
-                                </div>
-                                <div class="alert alert-info" role="alert" invisible="target_type != 'page'">
-                                    Attach this schema to a specific Odoo website page.
-                                </div>
-                                <div class="alert alert-info" role="alert" invisible="target_type != 'url'">
-                                    Use this when the page cannot be selected from Odoo page records.
-                                </div>
-                                <field name="website_page_id"
-                                       invisible="target_type != 'page'"
-                                       required="target_type == 'page'"/>
-                                <field name="target_url"
-                                       invisible="target_type == 'global'"
-                                       placeholder="/page-url, /tr/page-url, or https://example.com/page-url"/>
-                                <field name="resolved_url_preview" readonly="1"
-                                       invisible="target_type == 'global'"/>
-                            </group>
-                            <group string="Options">
-                                <field name="auto_populate"/>
-                                <field name="duplicate_warning" readonly="1"
-                                       invisible="not duplicate_warning"/>
-                            </group>
+                        <!-- FAQ first when the selected schema uses FAQ lines -->
+                        <page string="FAQ Items" name="faq_items" invisible="schema_type != 'FAQPage'">
+                            <div class="alert alert-warning" role="alert">
+                                FAQ schema should only be used when the same FAQs are visible on the page.
+                            </div>
+                            <button string="Add FAQ Item" name="action_add_sample_faq"
+                                    type="object" class="btn-secondary mb-2"/>
+                            <field name="faq_item_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="position" widget="handle"/>
+                                    <field name="question"/>
+                                    <field name="answer"/>
+                                    <field name="active" optional="show"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <field name="question"/>
+                                        <field name="answer" widget="text"/>
+                                        <field name="position"/>
+                                        <field name="active"/>
+                                    </group>
+                                </form>
+                            </field>
                         </page>
 
-                        <!-- Tab 2 — Field Values -->
+                        <page string="Breadcrumb Items" name="breadcrumb_items" invisible="schema_type != 'BreadcrumbList'">
+                            <div class="alert alert-info" role="alert">
+                                Suggest breadcrumbs from the render URL, then adjust names and URLs as needed. Positions must be sequential starting from 1.
+                            </div>
+                            <button string="Suggest Breadcrumbs from URL" name="action_suggest_breadcrumbs"
+                                    type="object" class="btn-secondary mb-2"/>
+                            <field name="breadcrumb_item_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="position" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="url"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <field name="name"/>
+                                        <field name="url"/>
+                                        <field name="position"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+
+                        <!-- Tab 1 — Field Values -->
                         <page string="Fields" name="field_values" invisible="schema_type == 'FAQPage'">
                             <div class="alert alert-info" role="alert">
-                                Use field labels for normal editing. Advanced users can edit Field Key dot-paths such as brand.@id or offers.priceSpecification.priceCurrency.
+                                Use Label and Value for normal editing. Field Key is for advanced JSON-LD mapping. The Schema URL / Canonical URL value is the URL inside JSON-LD, not the render target.
                             </div>
                             <field name="field_value_ids" nolabel="1">
                                 <list editable="bottom" optional="show">
@@ -135,15 +179,16 @@
                                     <field name="value_float"
                                            invisible="field_type not in ('float',)"
                                            optional="hide"/>
-                                    <field name="lang_code" optional="show"/>
+                                    <field name="value_json"
+                                           invisible="field_type not in ('json',)"
+                                           optional="hide"/>
                                 </list>
                                 <form>
                                     <group>
                                         <group>
-                                            <field name="field_key"/>
                                             <field name="field_label"/>
+                                            <field name="field_key"/>
                                             <field name="field_type"/>
-                                            <field name="lang_code"/>
                                             <field name="required"/>
                                             <field name="sequence"/>
                                         </group>
@@ -166,58 +211,6 @@
                                             <field name="value_float"
                                                    invisible="field_type not in ('float',)"/>
                                         </group>
-                                    </group>
-                                </form>
-                            </field>
-                        </page>
-
-                        <!-- Tab 3 — FAQ Items -->
-                        <page string="FAQ Items" name="faq_items" invisible="schema_type != 'FAQPage'">
-                            <div class="alert alert-warning" role="alert">
-                                Only use FAQPage schema if the same FAQ content is visible on the page.
-                            </div>
-                            <button string="Add Sample FAQ" name="action_add_sample_faq"
-                                    type="object" class="btn-secondary mb-2"/>
-                            <field name="faq_item_ids" nolabel="1">
-                                <list editable="bottom">
-                                    <field name="position" widget="handle"/>
-                                    <field name="question"/>
-                                    <field name="answer"/>
-                                    <field name="lang_code" optional="show"/>
-                                    <field name="active" optional="show"/>
-                                </list>
-                                <form>
-                                    <group>
-                                        <field name="question"/>
-                                        <field name="answer" widget="text"/>
-                                        <field name="position"/>
-                                        <field name="lang_code"/>
-                                        <field name="active"/>
-                                    </group>
-                                </form>
-                            </field>
-                        </page>
-
-                        <!-- Tab 4 — Breadcrumb Items -->
-                        <page string="Breadcrumb Items" name="breadcrumb_items" invisible="schema_type != 'BreadcrumbList'">
-                            <div class="alert alert-info" role="alert">
-                                Positions must be sequential starting from 1.
-                            </div>
-                            <button string="Suggest Breadcrumbs from URL" name="action_suggest_breadcrumbs"
-                                    type="object" class="btn-secondary mb-2"/>
-                            <field name="breadcrumb_item_ids" nolabel="1">
-                                <list editable="bottom">
-                                    <field name="position" widget="handle"/>
-                                    <field name="name"/>
-                                    <field name="url"/>
-                                    <field name="lang_code" optional="show"/>
-                                </list>
-                                <form>
-                                    <group>
-                                        <field name="name"/>
-                                        <field name="url"/>
-                                        <field name="position"/>
-                                        <field name="lang_code"/>
                                     </group>
                                 </form>
                             </field>
@@ -260,12 +253,11 @@
                             </div>
                         </page>
 
-                        <!-- Tab 7 — Manual JSON (managers only) -->
-                        <page string="Manual JSON" name="manual_json"
+                        <!-- Tab 6 — Manual JSON (managers only) -->
+                        <page string="Advanced JSON Override" name="manual_json"
                               groups="midvex_schema_manager.group_midvex_schema_manager">
                             <div class="alert alert-warning" role="alert">
-                                Enabling manual JSON bypasses all automatic generation and field values.
-                                The JSON is parsed and validated on save.
+                                Use this only if you want to fully replace the generated schema. Field values, FAQ items and breadcrumbs will be ignored.
                             </div>
                             <group>
                                 <field name="manual_json_enabled"/>
@@ -273,9 +265,8 @@
                             <group invisible="not manual_json_enabled"
                                    string="Manual JSON Override">
                                 <field name="manual_json" nolabel="1"
-                                       widget="ace"
-                                       options="{'mode': 'json'}"
-                                       placeholder='{"@context":"https://schema.org","@type":"..."}'/>
+                                       widget="text"
+                                       placeholder='{"@context":"https://schema.org","@type":"WebPage","name":"Example"}'/>
                             </group>
                         </page>
 
@@ -359,13 +350,13 @@
     </record>
 
     <record id="action_midvex_schema_dashboard" model="ir.actions.act_window">
-        <field name="name">Structured Data Dashboard</field>
+        <field name="name">Page Schemas</field>
         <field name="res_model">midvex.schema.record</field>
         <field name="view_mode">list,form</field>
         <field name="context">{'search_default_active': 1, 'default_target_type': 'page'}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Structured Data Dashboard
+                Structured Data
             </p>
             <p>Use Global Website Schema for Organization/WebSite schema. Use Page Schemas to add Product, FAQ, Breadcrumb, Article, Service or other JSON-LD schema to a specific website page or URL.</p>
             <p>Quick paths: Global Website Schema, Create Page Schema, Page Schemas, Template Library, Validation Issues, Documentation / How to Use.</p>

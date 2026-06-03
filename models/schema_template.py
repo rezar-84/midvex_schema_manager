@@ -71,6 +71,12 @@ class MidvexSchemaTemplate(models.Model):
         except (json.JSONDecodeError, TypeError):
             return {}
 
+    def get_recommended_target_type(self):
+        self.ensure_one()
+        if self.schema_type in ('Organization', 'WebSite'):
+            return 'global'
+        return 'page'
+
     @api.constrains('json_template', 'required_fields_json', 'optional_fields_json',
                     'auto_mapping_json', 'validation_rules_json')
     def _check_json_fields(self):
@@ -124,7 +130,7 @@ class MidvexSchemaTemplate(models.Model):
             'context': {
                 'default_schema_template_id': self.id,
                 'default_schema_type': self.schema_type,
-                'default_target_type': 'page',
+                'default_target_type': self.get_recommended_target_type(),
                 'default_name': self.name,
             },
         }
