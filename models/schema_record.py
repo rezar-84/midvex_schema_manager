@@ -13,26 +13,120 @@ _logger = logging.getLogger(__name__)
 _URL_RE = re.compile(r'^https?://', re.IGNORECASE)
 _LANG_RE = re.compile(r'^[a-z]{2,3}([_-][A-Z]{2})?$')
 
-# Matches Odoo language URL prefixes: /en/, /no/, /ko_KR/, /zh_TW/ etc.
-# Requires a following slash OR end-of-string so /no-deposit is NOT stripped.
+# Fallback regex for language prefixes when website language list is unavailable.
+# Requires a trailing slash OR end-of-string so /no-deposit is NOT stripped.
 _LANG_PREFIX_RE = re.compile(r'^/[a-z]{2,3}(?:_[A-Z]{2})?(?=/|$)')
 
 
-def _normalize_path(path):
-    """Strip Odoo language prefix from a URL path.
+# ---------------------------------------------------------------------------
+# P4 — Multilingual URL helpers
+# ---------------------------------------------------------------------------
 
-    /tr/about    -> /about
-    /ko_KR/page  -> /page
-    /en          -> /
-    /no-deposit  -> /no-deposit   (unchanged — not a language prefix)
+def _get_schema_lang_code(odoo_lang_code):
+    """Map an Odoo locale code to a 2-letter schema lang code.
+
+    'en_US' → 'en',  'ko_KR' → 'ko',  'tr_TR' → 'tr',  '' → 'en'
     """
-    if not path:
+    if not odoo_lang_code:
+        return 'en'
+    return odoo_lang_code.split('_')[0].lower()
+
+
+def _get_active_language_url_codes(website):
+    """Return a set of all language URL codes active on *website*.
+
+    Includes both the Odoo url_code (e.g. 'ko_KR') and the 2-letter prefix
+    ('ko') so that either format can match a URL segment.
+    Returns an empty set on error so callers fall back to regex stripping.
+    """
+    codes = set()
+    try:
+        for lang in website.language_ids:
+            url_code = (getattr(lang, 'url_code', '') or '').strip().lower()
+            if url_code:
+                codes.add(url_code)
+            codes.add(lang.code.split('_')[0].lower())
+    except Exception:
+        pass
+    return codes
+
+
+def _strip_language_prefix(path, active_lang_codes):
+    """Strip Odoo language URL prefix from *path*.
+
+    Uses *active_lang_codes* (from the current website) when available,
+    otherwise falls back to the regex pattern.
+
+    /tr/about    → /about
+    /ko_KR/page  → /page
+    /no-deposit  → /no-deposit   (not a language prefix)
+    """
+    if not path or path == '/':
         return path
+    if active_lang_codes:
+        parts = path.lstrip('/').split('/', 1)
+        if parts[0].lower() in active_lang_codes:
+            return '/' + parts[1] if len(parts) > 1 else '/'
     match = _LANG_PREFIX_RE.match(path)
     if match:
         tail = path[match.end():]
         return tail or '/'
     return path
+
+
+def _to_relative_path(url_or_path):
+    """Convert an absolute URL to its path component.
+
+    'https://example.com/products/page' → '/products/page'
+    '/products/page'                    → '/products/page'
+    """
+    if not url_or_path:
+        return ''
+    if url_or_path.startswith('http'):
+        try:
+            from urllib.parse import urlparse
+            return urlparse(url_or_path).path or '/'
+        except Exception:
+            pass
+    return url_or_path
+
+
+# ---------------------------------------------------------------------------
+# P7 — Nested dot-path helpers
+# ---------------------------------------------------------------------------
+
+def _set_nested_value(data, path, value):
+    """Set *value* at a dot-path key within *data*.
+
+    'name'                            → data['name'] = value
+    'offers.price'                    → data['offers']['price'] = value
+    'brand.@id'                       → data['brand']['@id'] = value
+    'offers.priceSpecification.price' → three levels deep
+    """
+    if '.' not in path:
+        data[path] = value
+        return
+    parts = path.split('.')
+    node = data
+    for part in parts[:-1]:
+        if part not in node or not isinstance(node[part], dict):
+            node[part] = {}
+        node = node[part]
+    node[parts[-1]] = value
+
+
+def _get_nested_value(data, path):
+    """Return value at a dot-path key within *data*, or None if absent."""
+    if not isinstance(data, dict):
+        return None
+    if '.' not in path:
+        return data.get(path)
+    node = data
+    for part in path.split('.'):
+        if not isinstance(node, dict):
+            return None
+        node = node.get(part)
+    return node
 
 
 class MidvexSchemaRecord(models.Model):
@@ -158,7 +252,9 @@ class MidvexSchemaRecord(models.Model):
         for fv in values.sorted('sequence'):
             val = fv.get_value()
             if val is not None and val != '' and val is not False:
-                data[fv.field_key] = val
+                # Dot-path keys (e.g. 'offers.price', 'brand.@id') are set
+                # at the correct nesting level; flat keys behave as before.
+                _set_nested_value(data, fv.field_key, val)
 
         return data
 
@@ -279,32 +375,42 @@ class MidvexSchemaRecord(models.Model):
                         f'Field "{fv.field_key}": URL does not start with http(s)://.'
                     )
 
+            # --- P6: template-driven required-field validation (non-empty) ---
+            if self.schema_template_id:
+                for field_path in self.schema_template_id.get_required_fields():
+                    val = _get_nested_value(data, field_path)
+                    if val is None or val == '' or val == [] or val == {}:
+                        errors.append(
+                            f'Required field "{field_path}" is missing or empty.'
+                        )
+
+            # --- Schema-type-specific checks (also used when no template) ---
             if self.schema_type == 'Product':
-                # Check both stored field keys AND the built data for non-empty values
-                field_keys = set(
-                    fv.field_key
-                    for fv in self.field_value_ids
-                    if fv.get_value() not in (None, '', False)
-                ) | (set(data.keys()) - {'@context', '@type'})
-                missing = {'name', 'description', 'image'} - field_keys
-                if missing:
-                    errors.append(
-                        f'Product schema requires: {", ".join(sorted(missing))}.'
-                    )
+                for req in ('name', 'description', 'image'):
+                    if not _get_nested_value(data, req):
+                        if not self.schema_template_id:
+                            # Only raise as error if no template (template check above covers it)
+                            errors.append(f'Product: "{req}" is required and must be non-empty.')
+                        # else: already reported by template check above
 
             elif self.schema_type == 'FAQPage':
                 if not self.faq_item_ids.filtered(lambda f: f.active):
-                    errors.append('FAQPage schema requires at least one active FAQ item.')
+                    errors.append('FAQPage requires at least one active FAQ item.')
 
             elif self.schema_type == 'BreadcrumbList':
                 if not self.breadcrumb_item_ids:
-                    errors.append('BreadcrumbList schema requires at least one breadcrumb item.')
+                    errors.append('BreadcrumbList requires at least one breadcrumb item.')
                 else:
                     positions = sorted(self.breadcrumb_item_ids.mapped('position'))
                     if positions != list(range(1, len(positions) + 1)):
                         warnings.append(
                             'BreadcrumbList item positions should be sequential starting from 1.'
                         )
+
+            elif self.schema_type in ('Organization', 'WebSite'):
+                for req in ('name', 'url'):
+                    if not _get_nested_value(data, req):
+                        warnings.append(f'{self.schema_type}: "{req}" is recommended.')
 
         dup = self.check_duplicate_schema()
         if dup:
@@ -442,25 +548,30 @@ class MidvexSchemaRecord(models.Model):
             if not website:
                 website = request.env['website'].get_current_website()
 
+            # Resolve language: prefer request.lang, fallback to env lang
             lang = getattr(request, 'lang', None)
+            odoo_lang_code = ''
             if lang and hasattr(lang, 'code'):
-                lang_code = lang.code.split('_')[0]
-            else:
-                lang_code = 'en'
+                odoo_lang_code = lang.code
+            elif getattr(request, 'env', None) and request.env.lang:
+                odoo_lang_code = request.env.lang
+            lang_code = _get_schema_lang_code(odoo_lang_code)
 
             raw_path = (
                 getattr(request.httprequest, 'path', '')
                 if hasattr(request, 'httprequest')
                 else ''
             )
-            current_path = _normalize_path(raw_path)
+            # Strip language prefix using website's active language codes
+            active_lang_codes = _get_active_language_url_codes(website)
+            current_path = _strip_language_prefix(raw_path, active_lang_codes)
         except Exception as exc:
             _logger.warning('midvex_schema_manager: could not resolve request context: %s', exc)
             return Markup('')
 
         parts = []
 
-        # ── 1. Global Settings: Organization + WebSite schema ─────────
+        # ── 1. Global Settings: Organization + WebSite @graph ─────────
         try:
             settings_parts = (
                 self.env['midvex.schema.settings']
@@ -484,6 +595,7 @@ class MidvexSchemaRecord(models.Model):
             base_domain + [('target_type', '=', 'global')]
         )
 
+        # Page matching: use normalized path
         matching_pages = self.env['website.page'].sudo().search(
             [('url', '=', current_path)]
         )
@@ -494,12 +606,18 @@ class MidvexSchemaRecord(models.Model):
             ]
         )
 
+        # URL matching: try normalized path, raw path, and relative-from-absolute target
+        url_search_paths = list({
+            current_path,
+            raw_path,
+            _to_relative_path(current_path),
+        } - {''})
         url_records = self.sudo().search(
             base_domain + [
                 ('target_type', '=', 'url'),
-                ('target_url', '=', current_path),
+                ('target_url', 'in', url_search_paths),
             ]
-        )
+        ) if url_search_paths else self.env['midvex.schema.record']
 
         all_records = (global_records + page_records + url_records).sorted(
             'priority', reverse=True

@@ -57,19 +57,14 @@ class MidvexSchemaLangWizard(models.TransientModel):
                 'duplicate_warning': False,
             })
 
-            # Fix child field_value_ids: update lang_code to the new language.
-            # copy() inherits the source lang_code on child records, which is wrong.
-            new_record.field_value_ids.filtered(
-                lambda v: v.lang_code == source.lang_code
-            ).write({'lang_code': lang_code})
-
-            # Also fix faq_item_ids and breadcrumb_item_ids
-            new_record.faq_item_ids.filtered(
-                lambda f: f.lang_code == source.lang_code
-            ).write({'lang_code': lang_code})
-
-            new_record.breadcrumb_item_ids.filtered(
-                lambda b: b.lang_code == source.lang_code
-            ).write({'lang_code': lang_code})
+            # MVP: language lives on the parent record only.
+            # Clear child lang_code so all rows are always included during
+            # schema generation, regardless of the language filter.
+            if new_record.field_value_ids:
+                new_record.field_value_ids.write({'lang_code': False})
+            if new_record.faq_item_ids:
+                new_record.faq_item_ids.write({'lang_code': False})
+            if new_record.breadcrumb_item_ids:
+                new_record.breadcrumb_item_ids.write({'lang_code': False})
 
         return {'type': 'ir.actions.act_window_close'}

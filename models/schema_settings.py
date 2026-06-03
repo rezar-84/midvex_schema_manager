@@ -164,10 +164,11 @@ class MidvexSchemaSettings(models.Model):
 
     def _render_global_for_website(self, website, lang_code):
         """
-        Return a list of safe JSON-LD <script> strings for Organization and WebSite.
+        Return a list with one safe JSON-LD <script> block using @graph.
 
-        Called by render_schema_for_request() during every public page view.
-        MUST NOT write to the database.
+        @graph wraps Organization + WebSite with cross-references via @id and
+        adds availableLanguage from website.language_ids.
+        Called from render_schema_for_request() — MUST NOT write to database.
         """
         settings = self.search([
             ('website_id', '=', website.id),
@@ -177,23 +178,41 @@ class MidvexSchemaSettings(models.Model):
             return []
 
         base_url = settings._get_base_url(website)
-        parts = []
+        graph = []
 
-        # Organization
+        # ── Organization node ─────────────────────────────────────────
         org_data = settings.generate_organization_json()
+        org_data.pop('@context', None)
         if base_url:
             org_data['@id'] = base_url + '/#organization'
-        parts.append(_build_jsonld_script(org_data))
+        graph.append(org_data)
 
-        # WebSite (with publisher back-reference to Organization)
+        # ── WebSite node ──────────────────────────────────────────────
         if settings.enable_website_schema:
             web_data = settings.generate_website_json()
+            web_data.pop('@context', None)
             if base_url:
                 web_data['@id'] = base_url + '/#website'
                 web_data['publisher'] = {'@id': base_url + '/#organization'}
-            parts.append(_build_jsonld_script(web_data))
 
-        return parts
+            # availableLanguage from Odoo website language configuration
+            try:
+                lang_list = [
+                    {
+                        '@type': 'Language',
+                        'name': lang.name,
+                        'alternateName': lang.code.split('_')[0],
+                    }
+                    for lang in website.language_ids
+                ]
+                if lang_list:
+                    web_data['availableLanguage'] = lang_list
+            except Exception:
+                pass
+
+            graph.append(web_data)
+
+        return [_build_jsonld_script({'@context': 'https://schema.org', '@graph': graph})]
 
     # ------------------------------------------------------------------
     # Backend preview
