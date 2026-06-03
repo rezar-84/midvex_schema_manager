@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Top-level "Structured Data" menu under Website > Configuration -->
+    <menuitem id="menu_midvex_structured_data_root"
+              name="Structured Data"
+              parent="website.menu_website_configuration"
+              sequence="95"/>
+
+    <!-- Global Settings -->
+    <menuitem id="menu_midvex_schema_settings"
+              name="Global Settings"
+              parent="menu_midvex_structured_data_root"
+              action="action_midvex_schema_settings"
+              sequence="1"
+              groups="midvex_schema_manager.group_midvex_schema_manager"/>
+
+    <!-- Schema Records -->
+    <menuitem id="menu_midvex_schema_records"
+              name="Schema Records"
+              parent="menu_midvex_structured_data_root"
+              action="action_midvex_schema_record"
+              sequence="2"
+              groups="midvex_schema_manager.group_midvex_schema_user"/>
+
+    <!-- Schema Templates -->
+    <menuitem id="menu_midvex_schema_templates"
+              name="Schema Templates"
+              parent="menu_midvex_structured_data_root"
+              action="action_midvex_schema_template"
+              sequence="3"
+              groups="midvex_schema_manager.group_midvex_schema_user"/>
+
+</odoo>

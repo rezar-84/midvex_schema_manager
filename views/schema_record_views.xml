@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Form view ───────────────────────────────────────────────────── -->
+    <record id="view_midvex_schema_record_form" model="ir.ui.view">
+        <field name="name">midvex.schema.record.form</field>
+        <field name="model">midvex.schema.record</field>
+        <field name="arch" type="xml">
+            <form string="Schema Record">
+                <header>
+                    <button string="Validate" name="action_validate"
+                            type="object" class="btn-primary"/>
+                    <button string="Generate JSON" name="action_generate_json"
+                            type="object"/>
+                    <button string="Auto-populate" name="action_auto_populate"
+                            type="object"
+                            invisible="not auto_populate or target_type not in ('page',)"/>
+                    <field name="validation_status" widget="statusbar"
+                           statusbar_visible="draft,valid,warning,error"/>
+                </header>
+
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button"
+                                type="object"
+                                name="action_open_rich_results_test"
+                                icon="fa-search"
+                                invisible="not target_url">
+                            <span class="o_stat_text">Rich Results Test</span>
+                        </button>
+                    </div>
+
+                    <widget name="web_ribbon" title="Archived"
+                            bg_color="bg-danger" invisible="active"/>
+
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Schema Record Name"/></h1>
+                    </div>
+
+                    <group>
+                        <group>
+                            <field name="schema_type"/>
+                            <field name="schema_template_id"
+                                   domain="[('schema_type','=',schema_type)]"/>
+                            <field name="lang_code" placeholder="en"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="website_id"/>
+                            <field name="priority"/>
+                            <field name="validation_status" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+
+                        <!-- Tab 1 — General -->
+                        <page string="General" name="general">
+                            <group string="Target">
+                                <field name="target_type" widget="radio" options="{'horizontal': true}"/>
+                                <field name="website_page_id"
+                                       invisible="target_type != 'page'"
+                                       required="target_type == 'page'"/>
+                                <field name="target_url"
+                                       invisible="target_type == 'global'"
+                                       placeholder="/about or https://example.com/about"/>
+                            </group>
+                            <group string="Options">
+                                <field name="auto_populate"/>
+                                <field name="duplicate_warning" readonly="1"
+                                       invisible="not duplicate_warning"/>
+                            </group>
+                        </page>
+
+                        <!-- Tab 2 — Field Values -->
+                        <page string="Fields" name="field_values">
+                            <field name="field_value_ids" nolabel="1">
+                                <list editable="bottom" optional="show">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="field_key"/>
+                                    <field name="field_label"/>
+                                    <field name="field_type"/>
+                                    <field name="value_char"
+                                           invisible="field_type not in ('char',)"
+                                           optional="show"/>
+                                    <field name="value_text"
+                                           invisible="field_type not in ('text',)"
+                                           optional="hide"/>
+                                    <field name="value_url"
+                                           invisible="field_type not in ('url',)"
+                                           optional="show"/>
+                                    <field name="value_boolean"
+                                           invisible="field_type not in ('boolean',)"
+                                           optional="hide"/>
+                                    <field name="value_integer"
+                                           invisible="field_type not in ('integer',)"
+                                           optional="hide"/>
+                                    <field name="value_float"
+                                           invisible="field_type not in ('float',)"
+                                           optional="hide"/>
+                                    <field name="lang_code" optional="show"/>
+                                    <field name="required" optional="hide"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <group>
+                                            <field name="field_key"/>
+                                            <field name="field_label"/>
+                                            <field name="field_type"/>
+                                            <field name="lang_code"/>
+                                            <field name="required"/>
+                                            <field name="sequence"/>
+                                        </group>
+                                        <group>
+                                            <field name="value_char"
+                                                   invisible="field_type not in ('char',)"/>
+                                            <field name="value_text"
+                                                   invisible="field_type not in ('text',)"/>
+                                            <field name="value_url"
+                                                   invisible="field_type not in ('url',)"/>
+                                            <field name="value_html"
+                                                   invisible="field_type not in ('html',)"/>
+                                            <field name="value_json"
+                                                   invisible="field_type not in ('json',)"
+                                                   widget="text"/>
+                                            <field name="value_boolean"
+                                                   invisible="field_type not in ('boolean',)"/>
+                                            <field name="value_integer"
+                                                   invisible="field_type not in ('integer',)"/>
+                                            <field name="value_float"
+                                                   invisible="field_type not in ('float',)"/>
+                                        </group>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+
+                        <!-- Tab 3 — FAQ Items -->
+                        <page string="FAQ Items" name="faq_items">
+                            <div class="alert alert-info" role="alert"
+                                 invisible="schema_type == 'FAQPage'">
+                                FAQ items are used when Schema Type is set to <b>FAQPage</b>.
+                                Only add FAQ schema if the same questions and answers are visible on the page.
+                            </div>
+                            <field name="faq_item_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="position" widget="handle"/>
+                                    <field name="question"/>
+                                    <field name="answer"/>
+                                    <field name="lang_code" optional="show"/>
+                                    <field name="active" optional="show"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <field name="question"/>
+                                        <field name="answer" widget="text"/>
+                                        <field name="position"/>
+                                        <field name="lang_code"/>
+                                        <field name="active"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+
+                        <!-- Tab 4 — Breadcrumb Items -->
+                        <page string="Breadcrumb Items" name="breadcrumb_items">
+                            <div class="alert alert-info" role="alert"
+                                 invisible="schema_type == 'BreadcrumbList'">
+                                Breadcrumb items are used when Schema Type is set to <b>BreadcrumbList</b>.
+                                Positions must be sequential starting from 1.
+                            </div>
+                            <field name="breadcrumb_item_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="position" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="url"/>
+                                    <field name="lang_code" optional="show"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <field name="name"/>
+                                        <field name="url"/>
+                                        <field name="position"/>
+                                        <field name="lang_code"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+
+                        <!-- Tab 5 — JSON Preview -->
+                        <page string="JSON Preview" name="json_preview">
+                            <group string="Generated JSON">
+                                <field name="generated_json" nolabel="1"
+                                       readonly="1" widget="text"/>
+                            </group>
+                            <group string="Generated HTML">
+                                <field name="generated_html" nolabel="1"
+                                       readonly="1" widget="text"/>
+                            </group>
+                        </page>
+
+                        <!-- Tab 6 — Validation -->
+                        <page string="Validation" name="validation">
+                            <group>
+                                <group>
+                                    <field name="validation_status" readonly="1"/>
+                                    <field name="last_generated_at" readonly="1"/>
+                                </group>
+                            </group>
+                            <group string="Validation Message">
+                                <field name="validation_message" nolabel="1"
+                                       readonly="1" widget="text"/>
+                            </group>
+                            <div class="o_form_buttons_view">
+                                <button string="Open Schema Markup Validator"
+                                        type="url"
+                                        url="https://validator.schema.org/"
+                                        class="btn-secondary me-2"/>
+                                <button string="Open Google Rich Results Test"
+                                        name="action_open_rich_results_test"
+                                        type="object"
+                                        class="btn-secondary"
+                                        invisible="not target_url"/>
+                            </div>
+                        </page>
+
+                        <!-- Tab 7 — Manual JSON (managers only) -->
+                        <page string="Manual JSON" name="manual_json"
+                              groups="midvex_schema_manager.group_midvex_schema_manager">
+                            <div class="alert alert-warning" role="alert">
+                                Enabling manual JSON bypasses all automatic generation and field values.
+                                The JSON is parsed and validated on save.
+                            </div>
+                            <group>
+                                <field name="manual_json_enabled"/>
+                            </group>
+                            <group invisible="not manual_json_enabled"
+                                   string="Manual JSON Override">
+                                <field name="manual_json" nolabel="1"
+                                       widget="ace"
+                                       options="{'mode': 'json'}"
+                                       placeholder='{"@context":"https://schema.org","@type":"..."}'/>
+                            </group>
+                        </page>
+
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── List view ───────────────────────────────────────────────────── -->
+    <record id="view_midvex_schema_record_list" model="ir.ui.view">
+        <field name="name">midvex.schema.record.list</field>
+        <field name="model">midvex.schema.record</field>
+        <field name="arch" type="xml">
+            <list string="Schema Records" default_order="priority desc, name">
+                <field name="name"/>
+                <field name="website_id" optional="show"/>
+                <field name="target_type"/>
+                <field name="target_url" optional="show"/>
+                <field name="lang_code"/>
+                <field name="schema_type"/>
+                <field name="active" optional="hide"/>
+                <field name="validation_status"
+                       decoration-success="validation_status == 'valid'"
+                       decoration-warning="validation_status == 'warning'"
+                       decoration-danger="validation_status == 'error'"
+                       decoration-muted="validation_status == 'draft'"/>
+                <field name="auto_populate" optional="hide"/>
+                <field name="last_generated_at" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Search view ─────────────────────────────────────────────────── -->
+    <record id="view_midvex_schema_record_search" model="ir.ui.view">
+        <field name="name">midvex.schema.record.search</field>
+        <field name="model">midvex.schema.record</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="schema_type"/>
+                <field name="target_url"/>
+                <field name="lang_code"/>
+                <filter string="Active" name="active" domain="[('active','=',True)]"/>
+                <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
+                <separator/>
+                <filter string="Valid" name="valid" domain="[('validation_status','=','valid')]"/>
+                <filter string="Errors" name="errors" domain="[('validation_status','=','error')]"/>
+                <filter string="Warnings" name="warnings" domain="[('validation_status','=','warning')]"/>
+                <separator/>
+                <filter string="Global" name="global" domain="[('target_type','=','global')]"/>
+                <filter string="Page" name="page" domain="[('target_type','=','page')]"/>
+                <filter string="Custom URL" name="url" domain="[('target_type','=','url')]"/>
+                <separator/>
+                <group expand="0" string="Group By">
+                    <filter string="Website" name="group_by_website" context="{'group_by':'website_id'}"/>
+                    <filter string="Schema Type" name="group_by_type" context="{'group_by':'schema_type'}"/>
+                    <filter string="Language" name="group_by_lang" context="{'group_by':'lang_code'}"/>
+                    <filter string="Target Type" name="group_by_target" context="{'group_by':'target_type'}"/>
+                    <filter string="Validation Status" name="group_by_status" context="{'group_by':'validation_status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── Action ──────────────────────────────────────────────────────── -->
+    <record id="action_midvex_schema_record" model="ir.actions.act_window">
+        <field name="name">Schema Records</field>
+        <field name="res_model">midvex.schema.record</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No schema records yet.
+            </p>
+            <p>Create a schema record to inject JSON-LD structured data into a specific page or URL.</p>
+        </field>
+    </record>
+
+</odoo>

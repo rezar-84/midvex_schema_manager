@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Form view ───────────────────────────────────────────────────── -->
+    <record id="view_midvex_schema_settings_form" model="ir.ui.view">
+        <field name="name">midvex.schema.settings.form</field>
+        <field name="model">midvex.schema.settings</field>
+        <field name="arch" type="xml">
+            <form string="Global Schema Settings">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="organization_name" placeholder="Organization Name"/>
+                        </h1>
+                    </div>
+
+                    <group string="Organization">
+                        <group>
+                            <field name="website_id"/>
+                            <field name="enable_global_schema"/>
+                            <field name="organization_name"/>
+                            <field name="legal_name"/>
+                            <field name="alternate_names"
+                                   placeholder="Comma-separated alternate names"/>
+                        </group>
+                        <group>
+                            <field name="logo_url" widget="url" placeholder="https://…"/>
+                            <field name="website_url" widget="url" placeholder="https://…"/>
+                            <field name="default_image_url" widget="url" placeholder="https://…"/>
+                            <field name="available_language_codes" placeholder="en,no,de"/>
+                        </group>
+                    </group>
+
+                    <group string="Contact Info">
+                        <group>
+                            <field name="email" widget="email"/>
+                            <field name="phone"/>
+                        </group>
+                    </group>
+
+                    <group string="Address">
+                        <group>
+                            <field name="street_address"/>
+                            <field name="city"/>
+                            <field name="region"/>
+                        </group>
+                        <group>
+                            <field name="postal_code"/>
+                            <field name="country_code" placeholder="NO"/>
+                        </group>
+                    </group>
+
+                    <group string="Social Links (Same As)">
+                        <field name="same_as_links" nolabel="1"
+                               widget="text"
+                               placeholder="https://linkedin.com/company/…&#10;https://twitter.com/…"/>
+                    </group>
+
+                    <group string="Schema Options">
+                        <group>
+                            <field name="enable_website_schema"/>
+                            <field name="enable_search_action"
+                                   invisible="not enable_website_schema"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── List view ───────────────────────────────────────────────────── -->
+    <record id="view_midvex_schema_settings_list" model="ir.ui.view">
+        <field name="name">midvex.schema.settings.list</field>
+        <field name="model">midvex.schema.settings</field>
+        <field name="arch" type="xml">
+            <list string="Global Schema Settings">
+                <field name="website_id"/>
+                <field name="organization_name"/>
+                <field name="website_url"/>
+                <field name="enable_global_schema"/>
+                <field name="enable_website_schema"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Action ──────────────────────────────────────────────────────── -->
+    <record id="action_midvex_schema_settings" model="ir.actions.act_window">
+        <field name="name">Global Settings</field>
+        <field name="res_model">midvex.schema.settings</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure global schema settings for your website.
+            </p>
+            <p>Create one settings record per website to define your Organization and WebSite schema.</p>
+        </field>
+    </record>
+
+</odoo>

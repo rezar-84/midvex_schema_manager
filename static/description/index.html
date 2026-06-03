@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Midvex Schema Manager</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #333; }
+        .hero { background: #2D6A9F; color: #fff; padding: 40px; text-align: center; }
+        .hero h1 { margin: 0 0 8px; font-size: 2rem; }
+        .hero p { margin: 0; font-size: 1.1rem; opacity: 0.9; }
+        .content { max-width: 800px; margin: 32px auto; padding: 0 24px; }
+        h2 { color: #2D6A9F; border-bottom: 2px solid #2D6A9F; padding-bottom: 4px; }
+        ul { padding-left: 20px; line-height: 1.8; }
+        .badge { display: inline-block; background: #2D6A9F; color: #fff;
+                 padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; margin: 2px; }
+        .footer { background: #f5f5f5; padding: 20px; text-align: center;
+                  font-size: 0.9rem; color: #666; margin-top: 40px; }
+        a { color: #2D6A9F; }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>Midvex Schema Manager</h1>
+        <p>JSON-LD Structured Data for Odoo 19 Websites</p>
+    </div>
+
+    <div class="content">
+        <h2>Overview</h2>
+        <p>
+            <strong>Midvex Schema Manager</strong> is a general-purpose Odoo 19 module for managing
+            <a href="https://json-ld.org/" target="_blank">JSON-LD structured data</a> across one or
+            multiple Odoo websites. It complements Odoo's native SEO tools (meta title, description,
+            keywords) by injecting <code>&lt;script type="application/ld+json"&gt;</code> blocks into
+            every page head automatically.
+        </p>
+
+        <h2>Key Features</h2>
+        <ul>
+            <li>Global <strong>Organization</strong> and <strong>WebSite</strong> schema per website</li>
+            <li>Page-specific and custom-URL schema records</li>
+            <li>Language-specific schema records (separate record per language)</li>
+            <li>12 built-in system templates: Organization, WebSite, Product, FAQPage, BreadcrumbList,
+                Article, BlogPosting, Service, ContactPage, AboutPage, CollectionPage, ItemList</li>
+            <li>Custom template support — create, duplicate, import, export, deactivate</li>
+            <li>Manual JSON override (admin only) — validated on save, never concatenated</li>
+            <li>Auto-fill from page SEO metadata (meta title, description, canonical URL)</li>
+            <li>Internal validation: @context, @type, required fields, URL formats, language codes,
+                Product / FAQPage / BreadcrumbList rules</li>
+            <li>Duplicate schema detection with warnings</li>
+            <li>QWeb injection into <code>website.layout</code> head</li>
+            <li>Schema preview endpoint at <code>/schema-preview/&lt;id&gt;</code> for admins</li>
+            <li>Links to Google Rich Results Test and Schema Markup Validator</li>
+        </ul>
+
+        <h2>Schema Types</h2>
+        <p>
+            <span class="badge">Organization</span>
+            <span class="badge">WebSite</span>
+            <span class="badge">Product</span>
+            <span class="badge">FAQPage</span>
+            <span class="badge">BreadcrumbList</span>
+            <span class="badge">Article</span>
+            <span class="badge">BlogPosting</span>
+            <span class="badge">Service</span>
+            <span class="badge">ContactPage</span>
+            <span class="badge">AboutPage</span>
+            <span class="badge">CollectionPage</span>
+            <span class="badge">ItemList</span>
+        </p>
+
+        <h2>Where to Find It</h2>
+        <p>After installation, navigate to <strong>Website &rarr; Configuration &rarr; Structured Data</strong>.</p>
+
+        <h2>Security</h2>
+        <ul>
+            <li><strong>Schema Manager</strong>: full create / edit / delete access (inherits Website Publisher)</li>
+            <li><strong>Schema User</strong>: read-only access (inherits Website Designer)</li>
+            <li>All JSON output uses <code>json.dumps()</code> — never string concatenation</li>
+            <li>Manual JSON is parsed and validated before saving</li>
+            <li>Inactive schemas and wrong-language schemas are never rendered</li>
+        </ul>
+
+        <h2>Compatibility</h2>
+        <ul>
+            <li>Odoo 19 Enterprise (primary target)</li>
+            <li>Odoo 19 Community (compatible)</li>
+            <li>Version: 19.0.1.0.0 &nbsp;|&nbsp; License: LGPL-3</li>
+        </ul>
+    </div>
+
+    <div class="footer">
+        Developed by <a href="https://midvex.com" target="_blank">Midvex.com</a> /
+        <strong>Reza Rezaei</strong>
+    </div>
+</body>
+</html>

@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- 1. Organization -->
+        <record id="schema_template_organization" model="midvex.schema.template">
+            <field name="name">Organization</field>
+            <field name="schema_type">Organization</field>
+            <field name="sequence">1</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Identifies the organization behind the website. Recommended on every site.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "",
+  "legalName": "",
+  "url": "",
+  "logo": "",
+  "email": "",
+  "telephone": "",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "",
+    "addressLocality": "",
+    "addressRegion": "",
+    "postalCode": "",
+    "addressCountry": ""
+  },
+  "sameAs": []
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name", "url"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["legalName", "logo", "email", "telephone", "address", "sameAs"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "url": "url"}]]></field>
+        </record>
+
+        <!-- 2. WebSite -->
+        <record id="schema_template_website" model="midvex.schema.template">
+            <field name="name">WebSite</field>
+            <field name="schema_type">WebSite</field>
+            <field name="sequence">2</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Identifies the website. Used to enable the Sitelinks Searchbox in Google.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "",
+  "url": "",
+  "inLanguage": []
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name", "url"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["inLanguage", "potentialAction"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "url": "url", "inLanguage": "inLanguage"}]]></field>
+        </record>
+
+        <!-- 3. Product -->
+        <record id="schema_template_product" model="midvex.schema.template">
+            <field name="name">Product</field>
+            <field name="schema_type">Product</field>
+            <field name="sequence">3</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Describes a product. Enables rich results with price, availability and reviews in Google.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "",
+  "description": "",
+  "image": "",
+  "brand": {
+    "@type": "Brand",
+    "name": ""
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": "",
+    "priceCurrency": "USD",
+    "availability": "https://schema.org/InStock",
+    "url": ""
+  }
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name", "description", "image"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["brand", "offers", "sku", "gtin", "aggregateRating"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "image": "image", "url": "url"}]]></field>
+        </record>
+
+        <!-- 4. FAQPage -->
+        <record id="schema_template_faqpage" model="midvex.schema.template">
+            <field name="name">FAQPage</field>
+            <field name="schema_type">FAQPage</field>
+            <field name="sequence">4</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Marks up a FAQ page. Questions and answers are added via the FAQ Items tab. Only add if the same content is visible on the page.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": []
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["mainEntity"]]]></field>
+            <field name="optional_fields_json"><![CDATA[[]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "url": "url"}]]></field>
+        </record>
+
+        <!-- 5. BreadcrumbList -->
+        <record id="schema_template_breadcrumblist" model="midvex.schema.template">
+            <field name="name">BreadcrumbList</field>
+            <field name="schema_type">BreadcrumbList</field>
+            <field name="sequence">5</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Defines the breadcrumb trail for a page. Items are added via the Breadcrumb Items tab.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": []
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["itemListElement"]]]></field>
+            <field name="optional_fields_json"><![CDATA[[]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{}]]></field>
+        </record>
+
+        <!-- 6. Article -->
+        <record id="schema_template_article" model="midvex.schema.template">
+            <field name="name">Article</field>
+            <field name="schema_type">Article</field>
+            <field name="sequence">6</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Marks up a news or editorial article. Enables rich results in Google News and Discover.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "",
+  "description": "",
+  "image": "",
+  "author": {
+    "@type": "Person",
+    "name": ""
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "",
+    "logo": {
+      "@type": "ImageObject",
+      "url": ""
+    }
+  },
+  "datePublished": "",
+  "dateModified": "",
+  "url": "",
+  "inLanguage": ""
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["headline", "image", "author", "publisher", "datePublished"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["description", "dateModified", "url", "inLanguage"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"headline": "name", "description": "description", "image": "image", "url": "url", "inLanguage": "inLanguage"}]]></field>
+        </record>
+
+        <!-- 7. BlogPosting -->
+        <record id="schema_template_blogposting" model="midvex.schema.template">
+            <field name="name">BlogPosting</field>
+            <field name="schema_type">BlogPosting</field>
+            <field name="sequence">7</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Marks up a blog post. Sub-type of Article, optimised for blogs.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "",
+  "description": "",
+  "image": "",
+  "author": {
+    "@type": "Person",
+    "name": ""
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": ""
+  },
+  "datePublished": "",
+  "dateModified": "",
+  "url": "",
+  "inLanguage": ""
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["headline", "author", "datePublished"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["description", "image", "publisher", "dateModified", "url", "inLanguage"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"headline": "name", "description": "description", "image": "image", "url": "url", "inLanguage": "inLanguage"}]]></field>
+        </record>
+
+        <!-- 8. Service -->
+        <record id="schema_template_service" model="midvex.schema.template">
+            <field name="name">Service</field>
+            <field name="schema_type">Service</field>
+            <field name="sequence">8</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Describes a service offered by the organization.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "Service",
+  "name": "",
+  "description": "",
+  "provider": {
+    "@type": "Organization",
+    "name": ""
+  },
+  "serviceType": "",
+  "url": "",
+  "image": "",
+  "areaServed": ""
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name", "description", "provider"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["serviceType", "url", "image", "areaServed"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "image": "image", "url": "url"}]]></field>
+        </record>
+
+        <!-- 9. ContactPage -->
+        <record id="schema_template_contactpage" model="midvex.schema.template">
+            <field name="name">ContactPage</field>
+            <field name="schema_type">ContactPage</field>
+            <field name="sequence">9</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Identifies a contact page. Helps search engines understand the page purpose.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "ContactPage",
+  "name": "",
+  "description": "",
+  "url": "",
+  "inLanguage": ""
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name", "url"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["description", "inLanguage"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "url": "url", "inLanguage": "inLanguage"}]]></field>
+        </record>
+
+        <!-- 10. AboutPage -->
+        <record id="schema_template_aboutpage" model="midvex.schema.template">
+            <field name="name">AboutPage</field>
+            <field name="schema_type">AboutPage</field>
+            <field name="sequence">10</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Identifies an about/company page. Helps search engines understand the page purpose.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "AboutPage",
+  "name": "",
+  "description": "",
+  "url": "",
+  "inLanguage": ""
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name", "url"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["description", "inLanguage"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "url": "url", "inLanguage": "inLanguage"}]]></field>
+        </record>
+
+        <!-- 11. CollectionPage -->
+        <record id="schema_template_collectionpage" model="midvex.schema.template">
+            <field name="name">CollectionPage</field>
+            <field name="schema_type">CollectionPage</field>
+            <field name="sequence">11</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Marks up a page that is a collection of items (e.g. category page, product listing).</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "",
+  "description": "",
+  "url": "",
+  "hasPart": []
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["name", "url"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["description", "hasPart", "inLanguage"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "url": "url", "inLanguage": "inLanguage"}]]></field>
+        </record>
+
+        <!-- 12. ItemList -->
+        <record id="schema_template_itemlist" model="midvex.schema.template">
+            <field name="name">ItemList</field>
+            <field name="schema_type">ItemList</field>
+            <field name="sequence">12</field>
+            <field name="is_system_template">True</field>
+            <field name="active">True</field>
+            <field name="description">Marks up a list of items, e.g. for carousel rich results in Google.</field>
+            <field name="json_template"><![CDATA[{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "",
+  "description": "",
+  "itemListElement": [],
+  "numberOfItems": 0
+}]]></field>
+            <field name="required_fields_json"><![CDATA[["itemListElement"]]]></field>
+            <field name="optional_fields_json"><![CDATA[["name", "description", "numberOfItems"]]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"name": "name", "description": "description", "url": "url"}]]></field>
+        </record>
+
+    </data>
+</odoo>

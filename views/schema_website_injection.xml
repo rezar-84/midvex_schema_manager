@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- t-out is the Odoo 17+ equivalent of t-raw; safe because render_schema_for_request returns Markup -->
+    <template id="midvex_schema_layout_injection" inherit_id="website.layout"
+              name="Midvex Schema JSON-LD Injection">
+        <xpath expr="//head" position="inside">
+            <t t-out="request.env['midvex.schema.record'].sudo().render_schema_for_request(request)"/>
+        </xpath>
+    </template>
+</odoo>

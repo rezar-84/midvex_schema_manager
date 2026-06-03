@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Form view ───────────────────────────────────────────────────── -->
+    <record id="view_midvex_schema_template_form" model="ir.ui.view">
+        <field name="name">midvex.schema.template.form</field>
+        <field name="model">midvex.schema.template</field>
+        <field name="arch" type="xml">
+            <form string="Schema Template">
+                <header>
+                    <button string="Duplicate" name="copy" type="object" class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object"
+                                name="action_export_template" icon="fa-download"
+                                invisible="1">
+                            <span class="o_stat_text">Export JSON</span>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="System Template"
+                            bg_color="bg-info" invisible="not is_system_template"/>
+                    <widget name="web_ribbon" title="Archived"
+                            bg_color="bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Template Name"/></h1>
+                        <h2><field name="schema_type" placeholder="Schema Type, e.g. Product"/></h2>
+                    </div>
+
+                    <group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                            <field name="is_system_template"
+                                   groups="base.group_system"/>
+                        </group>
+                        <group>
+                            <field name="description" placeholder="Describe when to use this template…"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="JSON Template" name="json_template">
+                            <group string="Default JSON Structure">
+                                <field name="json_template" nolabel="1"
+                                       widget="ace"
+                                       options="{'mode': 'json'}"
+                                       placeholder='{"@context":"https://schema.org","@type":"..."}'/>
+                            </group>
+                        </page>
+                        <page string="Fields &amp; Mapping" name="fields_mapping">
+                            <group>
+                                <group string="Required Fields (JSON array)">
+                                    <field name="required_fields_json" nolabel="1"
+                                           widget="text"
+                                           placeholder='["name","url"]'/>
+                                </group>
+                                <group string="Optional Fields (JSON array)">
+                                    <field name="optional_fields_json" nolabel="1"
+                                           widget="text"
+                                           placeholder='["description","image"]'/>
+                                </group>
+                            </group>
+                            <group string="Auto-fill Mapping (JSON object)">
+                                <field name="auto_mapping_json" nolabel="1"
+                                       widget="text"
+                                       placeholder='{"name":"name","url":"url"}'/>
+                            </group>
+                            <group string="Validation Rules (JSON object)">
+                                <field name="validation_rules_json" nolabel="1"
+                                       widget="text"
+                                       placeholder='{}'/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── List view ───────────────────────────────────────────────────── -->
+    <record id="view_midvex_schema_template_list" model="ir.ui.view">
+        <field name="name">midvex.schema.template.list</field>
+        <field name="model">midvex.schema.template</field>
+        <field name="arch" type="xml">
+            <list string="Schema Templates" default_order="sequence">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="schema_type"/>
+                <field name="description" optional="hide"/>
+                <field name="is_system_template"/>
+                <field name="active" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Search view ─────────────────────────────────────────────────── -->
+    <record id="view_midvex_schema_template_search" model="ir.ui.view">
+        <field name="name">midvex.schema.template.search</field>
+        <field name="model">midvex.schema.template</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="schema_type"/>
+                <filter string="System Templates" name="system" domain="[('is_system_template','=',True)]"/>
+                <filter string="Custom Templates" name="custom" domain="[('is_system_template','=',False)]"/>
+                <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
+                <separator/>
+                <group expand="0" string="Group By">
+                    <filter string="Schema Type" name="group_by_type" context="{'group_by':'schema_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── Action ──────────────────────────────────────────────────────── -->
+    <record id="action_midvex_schema_template" model="ir.actions.act_window">
+        <field name="name">Schema Templates</field>
+        <field name="res_model">midvex.schema.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No schema templates yet.
+            </p>
+            <p>Templates define the JSON-LD structure for each schema type.
+               12 built-in system templates are provided.</p>
+        </field>
+    </record>
+
+</odoo>
