@@ -26,9 +26,12 @@ class MidvexSchemaLangWizard(models.TransientModel):
         self.ensure_one()
         source = self.schema_record_id
         for lang in self.language_ids:
+            # Normalise 'en_US' → 'en', 'ko_KR' → 'ko'
             lang_code = lang.code.split('_')[0]
             if lang_code == source.lang_code:
                 continue
+
+            # Skip if a record already exists for this lang + target combination
             domain = [
                 ('website_id', '=', source.website_id.id),
                 ('target_type', '=', source.target_type),
@@ -42,7 +45,8 @@ class MidvexSchemaLangWizard(models.TransientModel):
                 domain.append(('target_url', '=', source.target_url))
             if self.env['midvex.schema.record'].search_count(domain):
                 continue
-            source.copy({
+
+            new_record = source.copy({
                 'lang_code': lang_code,
                 'name': '{} [{}]'.format(source.name, lang_code),
                 'generated_json': False,
@@ -52,4 +56,20 @@ class MidvexSchemaLangWizard(models.TransientModel):
                 'last_generated_at': False,
                 'duplicate_warning': False,
             })
+
+            # Fix child field_value_ids: update lang_code to the new language.
+            # copy() inherits the source lang_code on child records, which is wrong.
+            new_record.field_value_ids.filtered(
+                lambda v: v.lang_code == source.lang_code
+            ).write({'lang_code': lang_code})
+
+            # Also fix faq_item_ids and breadcrumb_item_ids
+            new_record.faq_item_ids.filtered(
+                lambda f: f.lang_code == source.lang_code
+            ).write({'lang_code': lang_code})
+
+            new_record.breadcrumb_item_ids.filtered(
+                lambda b: b.lang_code == source.lang_code
+            ).write({'lang_code': lang_code})
+
         return {'type': 'ir.actions.act_window_close'}

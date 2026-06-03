@@ -22,10 +22,9 @@ class MidvexSchemaController(http.Controller):
         if not record.exists() or not record.active:
             return Response('Not Found', status=404, content_type='text/plain')
 
-        if not record.generated_json:
-            record.generate_json()
-
-        output = record.generated_json or json.dumps({})
+        # Use build_schema_data() — read-only, no database write
+        data = record.build_schema_data()
+        output = json.dumps(data, ensure_ascii=False, indent=2) if data else '{}'
         return Response(
             output,
             status=200,

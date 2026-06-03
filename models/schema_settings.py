@@ -1,6 +1,7 @@
 import json
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
+
+from .json_utils import _build_jsonld_script
 
 
 class MidvexSchemaSettings(models.Model):
@@ -42,6 +43,10 @@ class MidvexSchemaSettings(models.Model):
          'Global schema settings must be unique per website.'),
     ]
 
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
     def _get_same_as_list(self):
         self.ensure_one()
         if not self.same_as_links:
@@ -59,6 +64,27 @@ class MidvexSchemaSettings(models.Model):
         if not self.available_language_codes:
             return []
         return [c.strip() for c in self.available_language_codes.split(',') if c.strip()]
+
+    def _get_base_url(self, website):
+        """Return a normalised base URL for @id references.
+
+        Priority:
+        1. settings.website_url (explicitly configured)
+        2. website.domain (Odoo website domain field)
+        """
+        self.ensure_one()
+        if self.website_url:
+            return self.website_url.rstrip('/')
+        domain = (getattr(website, 'domain', '') or '').strip()
+        if not domain:
+            return ''
+        if domain.startswith('http'):
+            return domain.rstrip('/')
+        return 'https://' + domain.rstrip('/')
+
+    # ------------------------------------------------------------------
+    # Schema data builders
+    # ------------------------------------------------------------------
 
     def generate_organization_json(self):
         self.ensure_one()
@@ -131,6 +157,47 @@ class MidvexSchemaSettings(models.Model):
             }
 
         return data
+
+    # ------------------------------------------------------------------
+    # Frontend rendering (read-only — no database writes)
+    # ------------------------------------------------------------------
+
+    def _render_global_for_website(self, website, lang_code):
+        """
+        Return a list of safe JSON-LD <script> strings for Organization and WebSite.
+
+        Called by render_schema_for_request() during every public page view.
+        MUST NOT write to the database.
+        """
+        settings = self.search([
+            ('website_id', '=', website.id),
+            ('enable_global_schema', '=', True),
+        ], limit=1)
+        if not settings:
+            return []
+
+        base_url = settings._get_base_url(website)
+        parts = []
+
+        # Organization
+        org_data = settings.generate_organization_json()
+        if base_url:
+            org_data['@id'] = base_url + '/#organization'
+        parts.append(_build_jsonld_script(org_data))
+
+        # WebSite (with publisher back-reference to Organization)
+        if settings.enable_website_schema:
+            web_data = settings.generate_website_json()
+            if base_url:
+                web_data['@id'] = base_url + '/#website'
+                web_data['publisher'] = {'@id': base_url + '/#organization'}
+            parts.append(_build_jsonld_script(web_data))
+
+        return parts
+
+    # ------------------------------------------------------------------
+    # Backend preview
+    # ------------------------------------------------------------------
 
     def _compute_global_schema_preview(self):
         for rec in self:

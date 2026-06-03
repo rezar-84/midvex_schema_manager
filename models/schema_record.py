@@ -6,10 +6,33 @@ from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 from markupsafe import Markup
 
+from .json_utils import _safe_json_dumps, _build_jsonld_script
+
 _logger = logging.getLogger(__name__)
 
 _URL_RE = re.compile(r'^https?://', re.IGNORECASE)
 _LANG_RE = re.compile(r'^[a-z]{2,3}([_-][A-Z]{2})?$')
+
+# Matches Odoo language URL prefixes: /en/, /no/, /ko_KR/, /zh_TW/ etc.
+# Requires a following slash OR end-of-string so /no-deposit is NOT stripped.
+_LANG_PREFIX_RE = re.compile(r'^/[a-z]{2,3}(?:_[A-Z]{2})?(?=/|$)')
+
+
+def _normalize_path(path):
+    """Strip Odoo language prefix from a URL path.
+
+    /tr/about    -> /about
+    /ko_KR/page  -> /page
+    /en          -> /
+    /no-deposit  -> /no-deposit   (unchanged — not a language prefix)
+    """
+    if not path:
+        return path
+    match = _LANG_PREFIX_RE.match(path)
+    if match:
+        tail = path[match.end():]
+        return tail or '/'
+    return path
 
 
 class MidvexSchemaRecord(models.Model):
@@ -69,8 +92,9 @@ class MidvexSchemaRecord(models.Model):
         'midvex.schema.breadcrumb.item', 'schema_record_id', string='Breadcrumb Items'
     )
 
-    # DB-level uniqueness guard for URL-based records (NULLs not caught here;
-    # the Python constraint _check_unique_schema_context handles those cases).
+    # DB-level guard for URL-based records.
+    # NULL values are not considered equal by PostgreSQL UNIQUE, so the Python
+    # constraint _check_unique_schema_context handles page/global uniqueness.
     _sql_constraints = [
         (
             'unique_url_schema_per_website_lang',
@@ -117,7 +141,7 @@ class MidvexSchemaRecord(models.Model):
                     raise ValidationError('Manual JSON must be valid JSON.')
 
     # ------------------------------------------------------------------
-    # JSON generation helpers
+    # Pure schema data builders (NO database writes)
     # ------------------------------------------------------------------
 
     def _build_json_from_fields(self, lang_code=None):
@@ -180,31 +204,46 @@ class MidvexSchemaRecord(models.Model):
             ],
         }
 
+    def build_schema_data(self):
+        """
+        Return the schema data dict for this record WITHOUT any database write.
+
+        This is the safe read-only path used during public website rendering.
+        Backend methods (generate_json, render_html) call this internally too.
+        """
+        self.ensure_one()
+        if self.manual_json_enabled and self.manual_json:
+            try:
+                # Re-parse: ensures no raw string injection escapes json.loads
+                return json.loads(self.manual_json)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        if self.schema_type == 'FAQPage':
+            return self._build_faqpage_json(self.lang_code)
+        if self.schema_type == 'BreadcrumbList':
+            return self._build_breadcrumb_json(self.lang_code)
+        data = self._build_json_from_fields(self.lang_code)
+        data.setdefault('@context', 'https://schema.org')
+        data.setdefault('@type', self.schema_type)
+        return data
+
     # ------------------------------------------------------------------
-    # Public methods
+    # Backend methods — may write to database (for caching / preview)
     # ------------------------------------------------------------------
 
     def generate_json(self):
+        """
+        Backend: compute schema data, store in generated_json + update last_generated_at.
+        Do NOT call this during public page rendering.
+        """
         self.ensure_one()
-
-        if self.manual_json_enabled and self.manual_json:
-            try:
-                data = json.loads(self.manual_json)
-            except (json.JSONDecodeError, TypeError):
-                self.write({
-                    'validation_status': 'error',
-                    'validation_message': 'Manual JSON is not valid JSON.',
-                })
-                return None
-        elif self.schema_type == 'FAQPage':
-            data = self._build_faqpage_json(self.lang_code)
-        elif self.schema_type == 'BreadcrumbList':
-            data = self._build_breadcrumb_json(self.lang_code)
-        else:
-            data = self._build_json_from_fields(self.lang_code)
-            data.setdefault('@context', 'https://schema.org')
-            data.setdefault('@type', self.schema_type)
-
+        data = self.build_schema_data()
+        if data is None:
+            self.write({
+                'validation_status': 'error',
+                'validation_message': 'Manual JSON is not valid JSON.',
+            })
+            return None
         result = json.dumps(data, ensure_ascii=False, indent=2)
         self.write({
             'generated_json': result,
@@ -213,17 +252,12 @@ class MidvexSchemaRecord(models.Model):
         return data
 
     def validate_schema(self):
+        """Backend: run validation checks and write validation_status + validation_message."""
         self.ensure_one()
         errors = []
         warnings = []
 
-        if not self.generated_json:
-            data = self.generate_json()
-        else:
-            try:
-                data = json.loads(self.generated_json)
-            except (json.JSONDecodeError, TypeError):
-                data = None
+        data = self.build_schema_data()
 
         if not isinstance(data, dict):
             errors.append('Schema must be a JSON object.')
@@ -246,6 +280,7 @@ class MidvexSchemaRecord(models.Model):
                     )
 
             if self.schema_type == 'Product':
+                # Check both stored field keys AND the built data for non-empty values
                 field_keys = set(
                     fv.field_key
                     for fv in self.field_value_ids
@@ -286,18 +321,22 @@ class MidvexSchemaRecord(models.Model):
         return status
 
     def render_html(self):
+        """
+        Backend: build a safe script tag and cache it in generated_html.
+        Uses _build_jsonld_script for XSS-safe output.
+        Do NOT call this during public page rendering — use build_schema_data() instead.
+        """
         self.ensure_one()
-        if not self.generated_json:
-            self.generate_json()
-        if not self.generated_json:
+        data = self.build_schema_data()
+        if not data:
             return ''
-        script = (
-            '<script type="application/ld+json">\n'
-            + self.generated_json
-            + '\n</script>'
-        )
+        script = _build_jsonld_script(data)
         self.write({'generated_html': script})
         return script
+
+    # ------------------------------------------------------------------
+    # Button / action methods
+    # ------------------------------------------------------------------
 
     def action_validate(self):
         self.ensure_one()
@@ -383,31 +422,71 @@ class MidvexSchemaRecord(models.Model):
                 })
         return True
 
+    # ------------------------------------------------------------------
+    # Frontend rendering (MUST remain read-only — no write() calls)
+    # ------------------------------------------------------------------
+
     @api.model
     def render_schema_for_request(self, request):
+        """
+        Called from the website.layout QWeb template on every public page view.
+
+        Contract:
+        - MUST NOT write to any database record.
+        - Returns Markup (safe HTML) of all applicable <script> tags.
+        - Global Settings Organization/WebSite schema is rendered first.
+        - Page/URL-specific records follow, sorted by priority desc.
+        """
         try:
-            website = request.env['website'].get_current_website()
+            website = getattr(request, 'website', None)
+            if not website:
+                website = request.env['website'].get_current_website()
+
             lang = getattr(request, 'lang', None)
             if lang and hasattr(lang, 'code'):
                 lang_code = lang.code.split('_')[0]
             else:
                 lang_code = 'en'
-            current_path = getattr(request.httprequest, 'path', '') if hasattr(request, 'httprequest') else ''
+
+            raw_path = (
+                getattr(request.httprequest, 'path', '')
+                if hasattr(request, 'httprequest')
+                else ''
+            )
+            current_path = _normalize_path(raw_path)
         except Exception as exc:
             _logger.warning('midvex_schema_manager: could not resolve request context: %s', exc)
             return Markup('')
 
+        parts = []
+
+        # ── 1. Global Settings: Organization + WebSite schema ─────────
+        try:
+            settings_parts = (
+                self.env['midvex.schema.settings']
+                .sudo()
+                ._render_global_for_website(website, lang_code)
+            )
+            parts.extend(settings_parts)
+        except Exception as exc:
+            _logger.error(
+                'midvex_schema_manager: error rendering global settings schema: %s', exc
+            )
+
+        # ── 2. Schema records (global target_type + page + url) ────────
         base_domain = [
             ('active', '=', True),
             ('website_id', '=', website.id),
             ('lang_code', '=', lang_code),
         ]
 
-        global_records = self.sudo().search(base_domain + [('target_type', '=', 'global')])
+        global_records = self.sudo().search(
+            base_domain + [('target_type', '=', 'global')]
+        )
 
-        matching_pages = self.env['website.page'].sudo().search([
-            ('url', '=', current_path),
-        ])
+        matching_pages = self.env['website.page'].sudo().search(
+            [('url', '=', current_path)]
+        )
         page_records = self.sudo().search(
             base_domain + [
                 ('target_type', '=', 'page'),
@@ -426,12 +505,11 @@ class MidvexSchemaRecord(models.Model):
             'priority', reverse=True
         )
 
-        parts = []
         for record in all_records:
             try:
-                html = record.render_html()
-                if html:
-                    parts.append(html)
+                data = record.build_schema_data()
+                if data:
+                    parts.append(_build_jsonld_script(data))
             except Exception as exc:
                 _logger.error(
                     'midvex_schema_manager: error rendering schema record %s: %s',
@@ -439,6 +517,10 @@ class MidvexSchemaRecord(models.Model):
                 )
 
         return Markup('\n'.join(parts))
+
+    # ------------------------------------------------------------------
+    # Utility methods
+    # ------------------------------------------------------------------
 
     @api.model
     def suggest_breadcrumbs_from_url(self, url):
@@ -496,6 +578,7 @@ class MidvexSchemaRecord(models.Model):
 
     @api.model
     def regenerate_all_active_schemas(self):
+        """Scheduled action: rebuild generated_json + generated_html for all active records."""
         records = self.search([('active', '=', True)])
         for record in records:
             try:
