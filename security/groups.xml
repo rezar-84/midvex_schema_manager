@@ -2,14 +2,14 @@
 <odoo>
     <data noupdate="1">
         <!-- Read-only: inherits website designer permissions -->
-        <record id="group_midvex_schema_user" model="ir.groups">
+        <record id="group_midvex_schema_user" model="res.groups">
             <field name="name">Schema User</field>
             <field name="category_id" ref="base.module_category_website"/>
             <field name="implied_ids" eval="[(4, ref('website.group_website_designer'))]"/>
         </record>
 
         <!-- Full access: inherits website publisher permissions -->
-        <record id="group_midvex_schema_manager" model="ir.groups">
+        <record id="group_midvex_schema_manager" model="res.groups">
             <field name="name">Schema Manager</field>
             <field name="category_id" ref="base.module_category_website"/>
             <field name="implied_ids" eval="[(4, ref('website.group_website_publisher'))]"/>
