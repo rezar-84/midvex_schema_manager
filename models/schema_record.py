@@ -206,8 +206,8 @@ class MidvexSchemaRecord(models.Model):
         'Render URL / Target URL',
         help='This controls where the schema is rendered. Use /page-url, /tr/page-url, or a full https://example.com/page-url URL.',
     )
-    lang_code = fields.Char('Language Code', required=True, default='en',
-                             help='This schema record renders only for this website language. Use a BCP 47 code such as en, no, or de.')
+    lang_code = fields.Char('Language Code', required=False,
+                             help='This schema record renders only for this website language. Use a BCP 47 code such as en, no, or de. Leave blank to apply to all languages.')
     schema_template_id = fields.Many2one(
         'midvex.schema.template', string='Schema Template', ondelete='set null',
         help='Start by selecting a schema template, such as Product, FAQPage, BreadcrumbList, Article, or Service.'
@@ -937,8 +937,8 @@ class MidvexSchemaRecord(models.Model):
         # ── 2. Query Page / URL Static records ────────
         base_domain = [
             ('active', '=', True),
-            ('website_id', '=', website.id),
-            ('lang_code', '=', lang_code),
+            ('website_id', 'in', [False, website.id]),
+            ('lang_code', 'in', [False, lang_code]),
         ]
 
         global_records = self.sudo().search(

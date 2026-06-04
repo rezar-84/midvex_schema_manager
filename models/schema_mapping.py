@@ -12,6 +12,7 @@ class MidvexSchemaMapping(models.Model):
     name = fields.Char(required=True)
     target_model_id = fields.Many2one(
         'ir.model', string='Target Model', required=True, ondelete='cascade',
+        domain="[('model', 'in', ['product.template', 'product.product', 'blog.post', 'event.event', 'slide.channel', 'website.page', 'res.partner'])]",
         help='Odoo model to map, e.g. Product Template, Blog Post'
     )
     target_model = fields.Char(
@@ -26,6 +27,22 @@ class MidvexSchemaMapping(models.Model):
     def _compute_target_model(self):
         for rec in self:
             rec.target_model = rec.target_model_id.model if rec.target_model_id else ''
+
+    @api.onchange('target_model_id')
+    def _onchange_target_model_id(self):
+        if not self.target_model_id:
+            return
+        model_name = self.target_model_id.model
+        template = self.env['midvex.schema.template']
+        if model_name == 'product.template':
+            template = self.env['midvex.schema.template'].search([('schema_type', '=', 'Product')], limit=1)
+        elif model_name == 'blog.post':
+            template = self.env['midvex.schema.template'].search([('schema_type', '=', 'BlogPosting')], limit=1)
+        elif model_name == 'website.page':
+            template = self.env['midvex.schema.template'].search([('schema_type', '=', 'WebPage')], limit=1)
+            
+        if template:
+            self.schema_template_id = template
 
     @api.model_create_multi
     def create(self, vals_list):
