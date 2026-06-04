@@ -351,7 +351,12 @@ class MidvexSchemaRecord(models.Model):
             ('website_id', '=', self.website_id.id),
         ], limit=1)
         if settings:
-            return settings._get_base_url(self.website_id)
+            settings_base = settings._get_base_url(self.website_id)
+            if settings_base:
+                return settings_base
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+        if base_url:
+            return base_url.rstrip('/')
         return ''
 
     def _get_absolute_target_url(self):
@@ -646,12 +651,7 @@ class MidvexSchemaRecord(models.Model):
 
     def action_open_rich_results_test(self):
         self.ensure_one()
-        url = self.target_url or ''
-        if url and not _URL_RE.match(url):
-            domain = ''
-            if self.website_id and self.website_id.domain:
-                domain = self.website_id.domain.rstrip('/')
-            url = domain + url
+        url = self._get_absolute_target_url()
         test_url = 'https://search.google.com/test/rich-results'
         if url:
             test_url += '?url=' + url

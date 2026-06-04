@@ -49,6 +49,14 @@ class TestSchemaRecord(TransactionCase):
         self.assertEqual(_to_relative_path('/products'), '/products')
         self.assertEqual(_to_relative_path(''), '')
 
+    def test_absolute_target_url_falls_back_to_web_base_url(self):
+        self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'https://example.com')
+        self.website.domain = False
+        self.assertEqual(
+            self.record._get_absolute_target_url(),
+            'https://example.com/test-product',
+        )
+
     # --- P7: nested dot-path helpers ---
 
     def test_set_nested_value_flat(self):
@@ -224,6 +232,24 @@ class TestSchemaRecord(TransactionCase):
         self.assertTrue(wizard_model._is_backend_request_path('/web/action/load'))
         self.assertFalse(wizard_model._is_backend_request_path('/products/sample-product'))
         self.assertFalse(wizard_model._is_backend_request_path('/tr/products/sample-product'))
+
+    def test_auto_populate_schema_url_is_absolute(self):
+        self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'https://example.com')
+        self.website.domain = False
+        page = self.env['website.page'].search([], limit=1)
+        record = self.env['midvex.schema.record'].create({
+            'name': 'Absolute URL Schema',
+            'website_id': self.website.id,
+            'target_type': 'page',
+            'website_page_id': page.id,
+            'target_url': page.url or '/absolute-url-schema',
+            'lang_code': 'en',
+            'schema_type': 'WebPage',
+        })
+        record.action_auto_populate()
+        url_field = record.field_value_ids.filtered(lambda line: line.field_key == 'url')[:1]
+        self.assertTrue(url_field)
+        self.assertTrue(url_field.value_url.startswith('https://example.com/'))
 
     def test_field_type_inference(self):
         self.assertEqual(_infer_schema_field_type('url'), 'url')
