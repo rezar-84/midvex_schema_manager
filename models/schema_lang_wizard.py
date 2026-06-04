@@ -1,4 +1,4 @@
-from odoo import api, fields, models
+from odoo import Command, api, fields, models
 from odoo.exceptions import UserError
 
 from .schema_record import _get_schema_lang_code
@@ -27,7 +27,7 @@ class MidvexSchemaLangWizard(models.TransientModel):
             active_langs = source.website_id.language_ids if source and source.website_id else self.env['res.lang']
             if not active_langs:
                 active_langs = self.env['res.lang'].search([('active', '=', True)])
-            vals['language_ids'] = [(6, 0, active_langs.ids)]
+            vals['language_ids'] = [Command.set(active_langs.ids)]
         return vals
 
     def action_create_for_languages(self):
@@ -37,6 +37,9 @@ class MidvexSchemaLangWizard(models.TransientModel):
         source = self.schema_record_id
         created_count = 0
         skipped_count = 0
+        field_values = self.env['midvex.schema.field.value']
+        faq_items = self.env['midvex.schema.faq.item']
+        breadcrumb_items = self.env['midvex.schema.breadcrumb.item']
         for lang in self.language_ids:
             # Normalise 'en_US' -> 'en', 'ko_KR' -> 'ko'
             lang_code = _get_schema_lang_code(lang.code)
@@ -62,7 +65,7 @@ class MidvexSchemaLangWizard(models.TransientModel):
 
             new_record = source.copy({
                 'lang_code': lang_code,
-                'name': '{} [{}]'.format(source.name, lang_code),
+                'name': f'{source.name} [{lang_code}]',
                 'generated_json': False,
                 'generated_html': False,
                 'validation_status': 'draft',
@@ -74,13 +77,17 @@ class MidvexSchemaLangWizard(models.TransientModel):
             # MVP: language lives on the parent record only.
             # Clear child lang_code so all rows are always included during
             # schema generation, regardless of the language filter.
-            if new_record.field_value_ids:
-                new_record.field_value_ids.write({'lang_code': False})
-            if new_record.faq_item_ids:
-                new_record.faq_item_ids.write({'lang_code': False})
-            if new_record.breadcrumb_item_ids:
-                new_record.breadcrumb_item_ids.write({'lang_code': False})
+            field_values |= new_record.field_value_ids
+            faq_items |= new_record.faq_item_ids
+            breadcrumb_items |= new_record.breadcrumb_item_ids
             created_count += 1
+
+        if field_values:
+            field_values.write({'lang_code': False})
+        if faq_items:
+            faq_items.write({'lang_code': False})
+        if breadcrumb_items:
+            breadcrumb_items.write({'lang_code': False})
 
         return {
             'type': 'ir.actions.client',

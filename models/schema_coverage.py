@@ -20,6 +20,36 @@ class MidvexSchemaCoverageReport(models.Model):
     ], readonly=True)
     needs_attention = fields.Boolean(readonly=True)
 
+    def action_open_website_page(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Website Page',
+            'res_model': 'website.page',
+            'view_mode': 'form',
+            'res_id': self.website_page_id.id,
+            'target': 'current',
+        }
+
+    def action_open_page_schemas(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Page Schemas',
+            'res_model': 'midvex.schema.record',
+            'view_mode': 'list,form',
+            'domain': [
+                ('target_type', '=', 'page'),
+                ('website_page_id', '=', self.website_page_id.id),
+            ],
+            'context': {
+                'default_target_type': 'page',
+                'default_website_page_id': self.website_page_id.id,
+                'default_website_id': self.website_id.id,
+                'default_target_url': self.url,
+            },
+        }
+
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
         self.env.cr.execute("""

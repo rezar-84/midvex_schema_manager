@@ -363,6 +363,9 @@ class MidvexSchemaRecord(models.Model):
             settings_base = settings._get_base_url(self.website_id)
             if settings_base:
                 return settings_base
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
+        if base_url:
+            return base_url.rstrip('/')
         try:
             from odoo.http import request
             request_base = getattr(request.httprequest, 'url_root', '') or ''
@@ -370,9 +373,6 @@ class MidvexSchemaRecord(models.Model):
                 return request_base.rstrip('/')
         except Exception:
             pass
-        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
-        if base_url:
-            return base_url.rstrip('/')
         return ''
 
     def _get_absolute_target_url(self):
@@ -559,7 +559,7 @@ class MidvexSchemaRecord(models.Model):
                 for field_path in self.schema_template_id.get_required_fields():
                     val = _get_nested_value(data, field_path)
                     if val is None or val == '' or val == [] or val == {}:
-                        if field_path == 'image':
+                        if field_path == 'image' and self.schema_type != 'Product':
                             warnings.append(
                                 'Field "image" is empty. Add a page SEO image or configure Global Website Schema default image.'
                             )
@@ -572,10 +572,9 @@ class MidvexSchemaRecord(models.Model):
             if self.schema_type == 'Product':
                 for req in ('name', 'description', 'image'):
                     if not _get_nested_value(data, req):
-                        if not self.schema_template_id:
-                            # Only raise as error if no template (template check above covers it)
-                            errors.append(f'Product: "{req}" is required and must be non-empty.')
-                        # else: already reported by template check above
+                        message = f'Product: "{req}" is required and must be non-empty.'
+                        if message not in errors:
+                            errors.append(message)
                 if not _get_nested_value(data, 'url'):
                     warnings.append('Product: "url" is recommended for Google Merchant readiness.')
                 if not (_get_nested_value(data, 'brand.@id') or _get_nested_value(data, 'brand.name')):

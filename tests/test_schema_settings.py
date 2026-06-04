@@ -61,3 +61,25 @@ class TestSchemaSettings(TransactionCase):
         scripts = self.settings._render_global_for_website(self.website, 'en')
         for script in scripts:
             self.assertNotIn('varsco.com', script)
+
+    def test_prepare_defaults_from_website(self):
+        defaults = self.env['midvex.schema.settings']._prepare_defaults_from_website(
+            self.website, only_empty=False
+        )
+        self.assertEqual(defaults['website_id'], self.website.id)
+        self.assertIn('organization_name', defaults)
+        self.assertIn('available_language_codes', defaults)
+        self.assertTrue(defaults.get('website_url'))
+
+    def test_global_settings_validation_status(self):
+        self.settings.action_validate_global_schema()
+        self.assertIn(self.settings.validation_status, ('valid', 'warning'))
+        self.assertTrue(self.settings.validation_message)
+
+    def test_global_settings_validation_errors_when_missing_required_data(self):
+        self.settings.organization_name = False
+        self.settings.website_url = False
+        self.website.domain = False
+        self.settings.action_validate_global_schema()
+        self.assertEqual(self.settings.validation_status, 'error')
+        self.assertIn('Organization Name', self.settings.validation_message)

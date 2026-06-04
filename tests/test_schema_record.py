@@ -365,6 +365,14 @@ class TestSchemaRecord(TransactionCase):
         self.assertEqual(wizard.schema_record_id, self.record)
         self.assertEqual(set(wizard.language_ids.ids), set(self.website.language_ids.ids))
 
+    def test_language_wizard_has_manager_acl(self):
+        acl = self.env['ir.model.access'].search([
+            ('model_id.model', '=', 'midvex.schema.lang.wizard'),
+            ('group_id', '=', self.env.ref('midvex_schema_manager.group_midvex_schema_manager').id),
+        ], limit=1)
+        self.assertTrue(acl)
+        self.assertTrue(acl.perm_read and acl.perm_write and acl.perm_create and acl.perm_unlink)
+
     # --- P10: duplicate prevention ---
 
     def test_duplicate_detection(self):

@@ -7,7 +7,22 @@
         <field name="model">midvex.schema.settings</field>
         <field name="arch" type="xml">
             <form string="Global Website Schema">
+                <header>
+                    <button string="Validate" name="action_validate_global_schema"
+                            type="object" class="btn-primary"/>
+                    <field name="validation_status" widget="statusbar"
+                           statusbar_visible="draft,valid,warning,error"/>
+                </header>
                 <sheet>
+                    <div class="alert alert-success" role="alert" invisible="validation_status != 'valid'">
+                        Global Website Schema is valid.
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="validation_status != 'warning'">
+                        <field name="validation_message" readonly="1" nolabel="1"/>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="validation_status != 'error'">
+                        <field name="validation_message" readonly="1" nolabel="1"/>
+                    </div>
                     <div class="oe_title">
                         <h1>
                             <field name="organization_name" placeholder="Organization Name"/>
@@ -101,6 +116,11 @@
                 <field name="website_url"/>
                 <field name="enable_global_schema"/>
                 <field name="enable_website_schema"/>
+                <field name="validation_status"
+                       decoration-success="validation_status == 'valid'"
+                       decoration-warning="validation_status == 'warning'"
+                       decoration-danger="validation_status == 'error'"
+                       decoration-muted="validation_status == 'draft'"/>
             </list>
         </field>
     </record>
