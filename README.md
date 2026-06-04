@@ -1,6 +1,6 @@
 # Midvex Schema Manager
 
-**Version:** 19.0.1.0.0 | **License:** LGPL-3 | **Author:** Midvex.com / Reza Rezaei
+**Version:** 19.0.1.1.0 | **License:** LGPL-3 | **Author:** Midvex.com / Reza Rezaei
 
 ---
 
@@ -135,7 +135,7 @@ Buttons on the form:
 
 ## Template Library
 
-12 built-in system templates (cannot be deleted, only deactivated):
+Built-in system templates (cannot be deleted, only deactivated):
 
 | # | Schema Type | Use Case |
 |---|---|---|
@@ -158,6 +158,9 @@ Buttons on the form:
 | 17 | PostalAddress | Address component schema |
 | 18 | OpeningHoursSpecification | Opening hours component schema |
 | 19 | GeoCoordinates | Latitude/longitude component schema |
+| 20 | ContactPoint | Contact type, phone, email and available language schema |
+| 21 | MedicalBusiness | Medical provider local business schema |
+| 22 | Dentist | Dental clinic/provider schema |
 
 Open **Website → Configuration → Structured Data → Template Library** to browse templates in a kanban library. Each card shows the schema type, description, required field count, and whether the template is system or custom.
 
@@ -181,8 +184,32 @@ Open **Website → Configuration → Structured Data → Batch Operations** to r
 
 - Validate all active schemas for a website
 - Generate previews for all active schemas for a website
+- Create translated schema records for all active website languages
 
 These operations update backend validation status and cached previews. They do not change public rendering behavior.
+
+## Coverage Report
+
+Open **Website → Configuration → Structured Data → Coverage Report** to review website pages, attached schema types, validation status, and pages that need attention. Filters highlight pages without schema, pages with validation errors, warnings, and draft schemas.
+
+## Tokens
+
+Schema field values can use safe tokens. Tokens are resolved through a whitelist only; unknown tokens remain unchanged and produce validation warnings.
+
+| Group | Tokens |
+|---|---|
+| Website | `{{ website.name }}`, `{{ website.domain }}` |
+| Company | `{{ company.name }}`, `{{ company.email }}`, `{{ company.phone }}` |
+| Page | `{{ page.name }}`, `{{ page.url }}`, `{{ page.meta_title }}`, `{{ page.meta_description }}` |
+| Current Request | `{{ current.url }}`, `{{ current.path }}`, `{{ current.lang }}`, `{{ current.canonical_url }}` |
+| Product, optional context | `{{ product.name }}`, `{{ product.description }}`, `{{ product.default_code }}`, `{{ product.price }}`, `{{ product.currency }}`, `{{ product.image_url }}`, `{{ product.website_url }}` |
+| Blog, optional context | `{{ blog.name }}`, `{{ blog.subtitle }}`, `{{ blog.author }}`, `{{ blog.date_published }}`, `{{ blog.url }}`, `{{ blog.image_url }}` |
+
+No Python expressions are evaluated.
+
+## Model Mappings
+
+Open **Website → Configuration → Structured Data → Model Mappings** to define reusable mappings from an Odoo model to schema dot-paths. Mapping lines support manual fallback values, whitelisted tokens, and direct Odoo field reads from the selected target record. Dot-paths such as `brand.@id` and `offers.priceSpecification.priceCurrency` build nested JSON safely.
 
 ---
 

@@ -114,6 +114,13 @@ class MidvexSchemaTemplate(models.Model):
         self.ensure_one()
         if self.schema_type in ('Organization', 'WebSite'):
             return 'global'
+        if self.schema_type in ('LocalBusiness',):
+            return 'global'
+        if self.schema_type in (
+            'Product', 'FAQPage', 'BreadcrumbList', 'Article', 'BlogPosting',
+            'ContactPage', 'AboutPage', 'Service', 'CollectionPage',
+        ):
+            return 'page'
         return 'page'
 
     @api.constrains('json_template', 'required_fields_json', 'optional_fields_json',

@@ -1,6 +1,6 @@
 {
     'name': 'Midvex Schema Manager',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'summary': 'Manage JSON-LD structured data across Odoo websites',
     'description': """
 Midvex Schema Manager
@@ -12,7 +12,9 @@ Features:
 - Global Organization / WebSite schema per website
 - Page-specific and URL-specific schema records
 - Language-specific schema records with one-click bulk language wizard
-- Schema template library with 12 built-in types + custom template support
+- Schema template library with global, page, product, FAQ, breadcrumb, local business and Google Merchant templates
+- Safe Drupal-style token resolver and model-to-schema mapping helpers
+- Coverage report and batch operations
 - Manual JSON override for admins (validated on save)
 - Auto-fill from page SEO metadata
 - Internal JSON-LD validation with Google Rich Results Test link
@@ -40,6 +42,8 @@ Features:
         # 3. Backend views (actions before menus)
         'views/schema_settings_views.xml',
         'views/schema_template_views.xml',
+        'views/schema_mapping_views.xml',
+        'views/schema_coverage_views.xml',
         'views/schema_record_views.xml',
         'views/schema_lang_wizard_views.xml',
         'views/schema_page_wizard_views.xml',

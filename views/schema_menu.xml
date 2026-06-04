@@ -48,11 +48,25 @@
               sequence="5"
               groups="midvex_schema_manager.group_midvex_schema_manager"/>
 
+    <menuitem id="menu_midvex_schema_coverage"
+              name="Coverage Report"
+              parent="menu_midvex_structured_data_root"
+              action="action_midvex_schema_coverage_report"
+              sequence="6"
+              groups="midvex_schema_manager.group_midvex_schema_manager"/>
+
+    <menuitem id="menu_midvex_schema_mappings"
+              name="Model Mappings"
+              parent="menu_midvex_structured_data_root"
+              action="action_midvex_schema_mapping"
+              sequence="7"
+              groups="midvex_schema_manager.group_midvex_schema_manager"/>
+
     <menuitem id="menu_midvex_schema_batch"
               name="Batch Operations"
               parent="menu_midvex_structured_data_root"
               action="action_midvex_schema_batch_wizard"
-              sequence="6"
+              sequence="8"
               groups="midvex_schema_manager.group_midvex_schema_manager"/>
 
 </odoo>

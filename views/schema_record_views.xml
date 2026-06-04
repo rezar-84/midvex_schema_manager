@@ -359,16 +359,16 @@
     </record>
 
     <record id="action_midvex_schema_dashboard" model="ir.actions.act_window">
-        <field name="name">Page Schemas</field>
+        <field name="name">Structured Data Dashboard</field>
         <field name="res_model">midvex.schema.record</field>
         <field name="view_mode">list,form</field>
-        <field name="context">{'search_default_active': 1, 'default_target_type': 'page'}</field>
+        <field name="context">{'search_default_active': 1, 'search_default_group_by_status': 1, 'default_target_type': 'page'}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Structured Data
             </p>
-            <p>Use Global Website Schema for Organization/WebSite schema. Use Page Schemas to add Product, FAQ, Breadcrumb, Article, Service or other JSON-LD schema to a specific website page or URL.</p>
-            <p>Quick paths: Global Website Schema, Create Page Schema, Page Schemas, Template Library, Validation Issues, Documentation / How to Use.</p>
+            <p>Workflow: configure Global Website Schema, create a Page Schema, select a template, attach it to a Website Page or Custom URL, fill fields, validate, preview, then render on the frontend.</p>
+            <p>Use the Structured Data menu for Global Website Schema, Create Page Schema, Page Schemas, Template Library, Coverage Report, Batch Operations and Model Mappings.</p>
         </field>
     </record>
 

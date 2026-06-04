@@ -168,6 +168,8 @@
                 <filter string="Page" name="page" domain="[('schema_type','not in',('Organization','WebSite'))]"/>
                 <filter string="Service / Page Type" name="service_page_types" domain="[('schema_type','in',('Service','WebPage','ContactPage','AboutPage','CollectionPage'))]"/>
                 <filter string="Global" name="global_types" domain="[('schema_type','in',('Organization','WebSite'))]"/>
+                <filter string="Local Business" name="local_business" domain="[('schema_type','in',('LocalBusiness','ProfessionalService','MedicalBusiness','Dentist','Place','PostalAddress','OpeningHoursSpecification','GeoCoordinates','ContactPoint'))]"/>
+                <filter string="Google Merchant" name="google_merchant" domain="[('name','ilike','Google Merchant')]"/>
                 <separator/>
                 <filter string="Schema Type" name="group_by_type" context="{'group_by':'schema_type'}"/>
             </search>

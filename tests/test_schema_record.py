@@ -248,6 +248,21 @@ class TestSchemaRecord(TransactionCase):
         user = self.env.ref('midvex_schema_manager.group_midvex_schema_user')
         self.assertIn(user, manager.implied_ids)
 
+    def test_auto_created_child_rows_are_language_neutral(self):
+        self.record.action_add_sample_faq()
+        self.record.action_suggest_breadcrumbs()
+        self.record.action_auto_populate()
+        self.assertFalse(any(self.record.faq_item_ids.mapped('lang_code')))
+        self.assertFalse(any(self.record.breadcrumb_item_ids.mapped('lang_code')))
+        self.assertFalse(any(self.record.field_value_ids.mapped('lang_code')))
+
+    def test_language_wizard_defaults_to_website_languages(self):
+        wizard = self.env['midvex.schema.lang.wizard'].with_context(
+            default_schema_record_id=self.record.id,
+        ).create({})
+        self.assertEqual(wizard.schema_record_id, self.record)
+        self.assertEqual(set(wizard.language_ids.ids), set(self.website.language_ids.ids))
+
     # --- P10: duplicate prevention ---
 
     def test_duplicate_detection(self):

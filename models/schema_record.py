@@ -324,6 +324,15 @@ class MidvexSchemaRecord(models.Model):
             )
         for fv in values.sorted('sequence'):
             val = fv.get_value()
+            if isinstance(val, str) and '{{' in val:
+                val, warnings = self.env['midvex.schema.token'].resolve_tokens(
+                    val, context=self._get_token_context()
+                )
+                if warnings:
+                    _logger.info(
+                        'midvex_schema_manager: unresolved token in schema record %s: %s',
+                        self.id, '; '.join(warnings),
+                    )
             if val is not None and val != '' and val is not False:
                 # Dot-path keys (e.g. 'offers.price', 'brand.@id') are set
                 # at the correct nesting level; flat keys behave as before.
@@ -354,6 +363,21 @@ class MidvexSchemaRecord(models.Model):
             return target
         base = self._get_base_url()
         return base + target if base else target
+
+    def _get_token_context(self):
+        self.ensure_one()
+        absolute_url = self._get_absolute_target_url()
+        return {
+            'website': self.website_id,
+            'company': self.website_id.company_id if self.website_id and 'company_id' in self.website_id._fields else self.env.company,
+            'page': self.website_page_id,
+            'current': {
+                'url': absolute_url,
+                'path': _to_relative_path(self.target_url or absolute_url),
+                'lang': self.lang_code,
+                'canonical_url': absolute_url,
+            },
+        }
 
     def _build_faqpage_json(self, lang_code=None):
         self.ensure_one()
@@ -493,6 +517,12 @@ class MidvexSchemaRecord(models.Model):
                             # Only raise as error if no template (template check above covers it)
                             errors.append(f'Product: "{req}" is required and must be non-empty.')
                         # else: already reported by template check above
+                if not _get_nested_value(data, 'url'):
+                    warnings.append('Product: "url" is recommended for Google Merchant readiness.')
+                if not (_get_nested_value(data, 'brand.@id') or _get_nested_value(data, 'brand.name')):
+                    warnings.append('Product: brand is recommended for Google Merchant readiness.')
+                if _get_nested_value(data, 'offers.price') and not _get_nested_value(data, 'offers.priceCurrency') and not _get_nested_value(data, 'offers.priceSpecification.priceCurrency'):
+                    warnings.append('Product: price is set but currency is missing.')
 
             elif self.schema_type == 'FAQPage':
                 if not self.faq_item_ids.filtered(lambda f: f.active):
@@ -517,6 +547,25 @@ class MidvexSchemaRecord(models.Model):
                         '%s schema is normally global. Use Target Type = Global unless this is an intentional advanced override.'
                         % self.schema_type
                     )
+            elif self.schema_type in ('LocalBusiness', 'ProfessionalService', 'MedicalBusiness', 'Dentist'):
+                if not (
+                    _get_nested_value(data, 'address.streetAddress')
+                    or _get_nested_value(data, 'address.addressLocality')
+                    or _get_nested_value(data, 'address.addressCountry')
+                ):
+                    warnings.append('%s: address fields are recommended for local SEO.' % self.schema_type)
+                if not (_get_nested_value(data, 'telephone') or _get_nested_value(data, 'email')):
+                    warnings.append('%s: telephone or email is recommended for local SEO.' % self.schema_type)
+
+            unresolved = []
+            for fv in self.field_value_ids:
+                val = fv.get_value()
+                if isinstance(val, str) and '{{' in val:
+                    _resolved, token_warnings = self.env['midvex.schema.token'].resolve_tokens(
+                        val, context=self._get_token_context()
+                    )
+                    unresolved.extend(token_warnings)
+            warnings.extend(unresolved)
 
             if self.target_type == 'global' and self.schema_type in ('Organization', 'WebSite'):
                 settings = self.env['midvex.schema.settings'].search([
@@ -697,7 +746,7 @@ class MidvexSchemaRecord(models.Model):
                     'value_char': value if field_type == 'char' else False,
                     'value_text': value if field_type == 'text' else False,
                     'value_url': value if field_type == 'url' else False,
-                    'lang_code': self.lang_code,
+                    'lang_code': False,
                 })
         return True
 
@@ -719,7 +768,7 @@ class MidvexSchemaRecord(models.Model):
                     'position': index,
                     'name': crumb['name'],
                     'url': crumb['url'],
-                    'lang_code': record.lang_code,
+                    'lang_code': False,
                 })
                 for index, crumb in enumerate(crumbs, start=1)
             ]
@@ -732,7 +781,7 @@ class MidvexSchemaRecord(models.Model):
                 'position': next_position,
                 'question': 'New question',
                 'answer': 'Replace this answer with FAQ content that is visible on the page.',
-                'lang_code': record.lang_code,
+                'lang_code': False,
                 'active': True,
             })]
         return True
