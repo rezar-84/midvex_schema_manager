@@ -1,5 +1,6 @@
 from odoo.tests.common import TransactionCase
 from odoo.tests import tagged
+from odoo import Command
 
 from ..models.schema_record import _strip_language_prefix, _get_schema_lang_code
 
@@ -46,7 +47,7 @@ class TestRendering(TransactionCase):
         })
         wizard = self.env['midvex.schema.lang.wizard'].create({
             'schema_record_id': self.en_record.id,
-            'language_ids': [(6, 0, self.env['res.lang'].search([
+            'language_ids': [Command.set(self.env['res.lang'].search([
                 ('active', '=', True), ('code', 'like', 'tr')
             ]).ids)],
         })

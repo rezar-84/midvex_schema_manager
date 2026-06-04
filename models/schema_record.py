@@ -2,7 +2,7 @@ import json
 import re
 import logging
 
-from odoo import api, fields, models
+from odoo import api, fields, models, Command
 from odoo.exceptions import ValidationError
 from markupsafe import Markup
 
@@ -854,8 +854,8 @@ class MidvexSchemaRecord(models.Model):
     def action_suggest_breadcrumbs(self):
         for record in self:
             crumbs = record.suggest_breadcrumbs_from_url(record.target_url or '/')
-            record.breadcrumb_item_ids = [(5, 0, 0)] + [
-                (0, 0, {
+            record.breadcrumb_item_ids = [Command.clear()] + [
+                Command.create({
                     'position': index,
                     'name': crumb['name'],
                     'url': crumb['url'],
@@ -868,7 +868,7 @@ class MidvexSchemaRecord(models.Model):
     def action_add_sample_faq(self):
         for record in self:
             next_position = max(record.faq_item_ids.mapped('position') or [0]) + 1
-            record.faq_item_ids = [(0, 0, {
+            record.faq_item_ids = [Command.create({
                 'position': next_position,
                 'question': 'New question',
                 'answer': 'Replace this answer with FAQ content that is visible on the page.',
@@ -890,6 +890,7 @@ class MidvexSchemaRecord(models.Model):
         - MUST NOT write to any database record.
         - Returns Markup (safe HTML) of all applicable <script> tags.
         - Global Website Schema Organization/WebSite schema is rendered first.
+        - Dynamic Model Mappings follow (if no static overrides exist).
         - Page/URL-specific records follow, sorted by priority desc.
         """
         try:
@@ -933,7 +934,7 @@ class MidvexSchemaRecord(models.Model):
                 'midvex_schema_manager: error rendering global settings schema: %s', exc
             )
 
-        # ── 2. Schema records (global target_type + page + url) ────────
+        # ── 2. Query Page / URL Static records ────────
         base_domain = [
             ('active', '=', True),
             ('website_id', '=', website.id),
@@ -976,6 +977,62 @@ class MidvexSchemaRecord(models.Model):
             ]
         ) if url_search_paths else self.env['midvex.schema.record']
 
+        # ── 3. Dynamic Model Mappings (fallback when no specific static schema overrides exist) ───
+        if not page_records and not url_records:
+            try:
+                main_object = None
+                if getattr(request, 'env', None) and request.env.context.get('main_object'):
+                    main_object = request.env.context.get('main_object')
+                elif hasattr(request, 'main_object') and request.main_object:
+                    main_object = request.main_object
+                
+                if not main_object and hasattr(request, 'route_parameters') and request.route_parameters:
+                    for param_val in request.route_parameters.values():
+                        if isinstance(param_val, models.BaseModel) and len(param_val) == 1:
+                            if param_val._name != 'website':
+                                main_object = param_val
+                                break
+                                
+                if main_object:
+                    mapping = self.env['midvex.schema.mapping'].sudo().search([
+                        ('active', '=', True),
+                        ('target_model_id.model', '=', main_object._name)
+                    ], limit=1)
+                    if not mapping:
+                        mapping = self.env['midvex.schema.mapping'].sudo().search([
+                            ('active', '=', True),
+                            ('target_model', '=', main_object._name)
+                        ], limit=1)
+                        
+                    if mapping:
+                        current_url = base_url + raw_path if base_url else raw_path
+                        current_dict = {
+                            'url': current_url,
+                            'path': raw_path,
+                            'lang': lang_code,
+                            'canonical_url': current_url,
+                        }
+                        token_context = {
+                            'website': website,
+                            'company': website.company_id if 'company_id' in website._fields and website.company_id else request.env.company,
+                            'current': current_dict,
+                        }
+                        if main_object._name in ('product.template', 'product.product'):
+                            token_context['product'] = main_object
+                        elif main_object._name == 'blog.post':
+                            token_context['blog'] = main_object
+                        elif main_object._name == 'website.page':
+                            token_context['page'] = main_object
+                            
+                        data = mapping.build_schema_data(main_object, context=token_context)
+                        if data:
+                            parts.append(_build_jsonld_script(data))
+            except Exception as exc:
+                _logger.error(
+                    'midvex_schema_manager: error rendering dynamic model mapping: %s', exc
+                )
+
+        # ── 4. Render Static schemas (sorted by priority desc) ───
         all_records = (global_records + page_records + url_records).sorted(
             'priority', reverse=True
         )
@@ -1049,7 +1106,7 @@ class MidvexSchemaRecord(models.Model):
             return
         self.schema_type = self.schema_template_id.schema_type
         self.target_type = self.schema_template_id.get_recommended_target_type()
-        commands = [(5, 0, 0)] + self._prepare_template_field_commands(
+        commands = [Command.clear()] + self._prepare_template_field_commands(
             required=True, optional=False, ignore_existing=True
         )
         if self.schema_template_id.load_optional_fields_by_default:
@@ -1087,7 +1144,7 @@ class MidvexSchemaRecord(models.Model):
         for field_key in field_keys:
             if field_key in existing_keys:
                 continue
-            commands.append((0, 0, {
+            commands.append(Command.create({
                 'field_key': field_key,
                 'field_label': _schema_field_label(field_key),
                 'field_type': _infer_schema_field_type(field_key),
@@ -1107,7 +1164,7 @@ class MidvexSchemaRecord(models.Model):
         for record in self:
             if not record.schema_template_id:
                 continue
-            commands = [(5, 0, 0)] + record._prepare_template_field_commands(
+            commands = [Command.clear()] + record._prepare_template_field_commands(
                 required=True, optional=False, ignore_existing=True
             )
             record.write({'field_value_ids': commands})

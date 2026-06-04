@@ -1,5 +1,6 @@
 from odoo.tests.common import TransactionCase
 from odoo.tests import tagged
+from odoo import Command
 
 
 @tagged('post_install', '-at_install', 'midvex_schema')
@@ -44,12 +45,12 @@ class TestSchemaTokenMapping(TransactionCase):
             'target_model': 'website.page',
             'schema_template_id': template.id,
             'line_ids': [
-                (0, 0, {
+                Command.create({
                     'schema_field_path': 'name',
                     'source_type': 'token',
                     'token': '{{ page.name }}',
                 }),
-                (0, 0, {
+                Command.create({
                     'schema_field_path': 'brand.@id',
                     'source_type': 'token',
                     'token': '{{ current.canonical_url }}#brand',
@@ -74,7 +75,7 @@ class TestSchemaTokenMapping(TransactionCase):
             'lang_code': 'en',
             'schema_type': 'WebPage',
             'field_value_ids': [
-                (0, 0, {
+                Command.create({
                     'field_key': 'name',
                     'field_type': 'char',
                     'value_char': '{{ website.name }}',
@@ -83,3 +84,64 @@ class TestSchemaTokenMapping(TransactionCase):
         })
         data = record.build_schema_data()
         self.assertEqual(data['name'], self.website.name)
+
+    def test_model_mapping_frontend_rendering(self):
+        # 1. Create dummy request-like object
+        class DummyHttpRequest:
+            def __init__(self):
+                self.path = '/shop/product/dummy-product'
+                
+        class DummyRequest:
+            def __init__(self, env):
+                self.env = env
+                self.website = env.ref('website.default_website')
+                self.httprequest = DummyHttpRequest()
+                self.lang = env['res.lang'].search([('active', '=', True)], limit=1)
+                self.route_parameters = {}
+                
+        req = DummyRequest(self.env)
+        
+        # 2. Find or create a product template
+        product = self.env['product.template'].search([], limit=1)
+        if not product:
+            product = self.env['product.template'].create({
+                'name': 'Test Mapping Product',
+                'list_price': 99.99,
+            })
+            
+        req.route_parameters['product'] = product
+        
+        # 3. Create a mapping for product.template
+        template = self.env.ref('midvex_schema_manager.schema_template_product')
+        mapping = self.env['midvex.schema.mapping'].create({
+            'name': 'Test Product Template Mapping',
+            'target_model_id': self.env['ir.model'].search([('model', '=', 'product.template')], limit=1).id,
+            'schema_template_id': template.id,
+            'line_ids': [
+                Command.create({
+                    'schema_field_path': 'name',
+                    'source_type': 'odoo_field',
+                    'odoo_field_id': self.env['ir.model.fields'].search([
+                        ('model_id.model', '=', 'product.template'),
+                        ('name', '=', 'name')
+                    ], limit=1).id,
+                }),
+                Command.create({
+                    'schema_field_path': 'offers.price',
+                    'source_type': 'odoo_field',
+                    'odoo_field_id': self.env['ir.model.fields'].search([
+                        ('model_id.model', '=', 'product.template'),
+                        ('name', '=', 'list_price')
+                    ], limit=1).id,
+                }),
+            ]
+        })
+        
+        # 4. Render schema for request
+        res = self.env['midvex.schema.record'].render_schema_for_request(req)
+        
+        # 5. Verify script matches expectations
+        self.assertIn('"@type": "Product"', res)
+        self.assertIn(f'"name": "{product.name}"', res)
+        self.assertIn('"price":', res)
+

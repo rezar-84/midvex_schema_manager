@@ -17,6 +17,11 @@ class MidvexSchemaSettings(models.Model):
         'website', string='Website', required=True, ondelete='cascade',
         default=lambda self: self.env['website'].get_current_website(),
     )
+    company_id = fields.Many2one(
+        'res.company', string='Source Company', required=True,
+        default=lambda self: self.env.company,
+        help='Company metadata source'
+    )
     enable_global_schema = fields.Boolean('Enable Global Schema', default=True)
     organization_name = fields.Char('Organization Name')
     legal_name = fields.Char('Legal Name')
@@ -61,16 +66,42 @@ class MidvexSchemaSettings(models.Model):
     def default_get(self, fields_list):
         vals = super().default_get(fields_list)
         website = self.env['website'].browse(vals.get('website_id')) if vals.get('website_id') else self.env['website'].get_current_website()
+        if website:
+            company = website.company_id if 'company_id' in website._fields and website.company_id else self.env.company
+            vals.setdefault('company_id', company.id)
         vals.update(self._prepare_defaults_from_website(website, only_empty=True, current_vals=vals))
         return vals
 
     @api.onchange('website_id')
     def _onchange_website_id(self):
         for rec in self:
+            if rec.website_id and rec.website_id.company_id:
+                rec.company_id = rec.website_id.company_id
             defaults = rec._prepare_defaults_from_website(rec.website_id, only_empty=True)
             for field_name, value in defaults.items():
                 if not rec[field_name]:
                     rec[field_name] = value
+
+    @api.onchange('company_id')
+    def _onchange_company_id(self):
+        for rec in self:
+            if not rec.company_id:
+                continue
+            company = rec.company_id
+            partner = company.partner_id
+            rec.organization_name = company.name
+            rec.legal_name = company.name
+            rec.email = company.email or partner.email
+            rec.phone = company.phone or partner.phone or partner.mobile
+            rec.street_address = partner.street
+            rec.city = partner.city
+            rec.region = partner.state_id.name if partner.state_id else ''
+            rec.postal_code = partner.zip
+            rec.country_code = partner.country_id.code if partner.country_id else ''
+            if company and ('logo' in company._fields or 'image_1920' in company._fields):
+                rec.logo_url = rec._absolute_url_for_website(
+                    rec.website_id, f'/web/image/res.company/{company.id}/logo'
+                )
 
     @api.model
     def _absolute_url_for_website(self, website, path):
@@ -92,10 +123,17 @@ class MidvexSchemaSettings(models.Model):
         current_vals = current_vals or {}
         if not website:
             return {}
-        company = website.company_id if 'company_id' in website._fields and website.company_id else self.env.company
+        # Use company_id from current values if available, otherwise website company or env.company
+        company_id = current_vals.get('company_id') or (self.company_id.id if self.company_id else False)
+        if company_id:
+            company = self.env['res.company'].browse(company_id)
+        else:
+            company = website.company_id if 'company_id' in website._fields and website.company_id else self.env.company
+        
         partner = company.partner_id if company and company.partner_id else self.env['res.partner']
         values = {
             'website_id': website.id,
+            'company_id': company.id,
             'organization_name': company.name,
             'legal_name': company.name,
             'website_url': self._absolute_url_for_website(website, '/'),
@@ -120,6 +158,7 @@ class MidvexSchemaSettings(models.Model):
                 if value and not current_vals.get(key)
             }
         return values
+
 
     def _get_same_as_list(self):
         self.ensure_one()

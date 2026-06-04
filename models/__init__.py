@@ -7,6 +7,5 @@ from . import schema_token
 from . import schema_mapping
 from . import schema_coverage
 from . import schema_record
-from . import schema_lang_wizard
 from . import schema_page_wizard
 from . import schema_batch_wizard

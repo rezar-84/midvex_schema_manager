@@ -36,6 +36,7 @@
                             <group string="Organization">
                                 <group>
                                     <field name="website_id"/>
+                                    <field name="company_id" options="{'no_create': True, 'no_open': True}"/>
                                     <field name="enable_global_schema"/>
                                     <field name="organization_name"/>
                                     <field name="legal_name"/>
