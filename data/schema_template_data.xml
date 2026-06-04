@@ -166,7 +166,7 @@
 }]]></field>
             <field name="required_fields_json"><![CDATA[["headline", "image", "author", "publisher", "datePublished"]]]></field>
             <field name="optional_fields_json"><![CDATA[["description", "dateModified", "url", "inLanguage"]]]></field>
-            <field name="auto_mapping_json"><![CDATA[{"headline": "name", "description": "description", "image": "image", "url": "url", "inLanguage": "inLanguage"}]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"headline": "name", "description": "description", "image": "image", "url": "url", "inLanguage": "inLanguage", "datePublished": "datePublished", "dateModified": "dateModified", "author.name": "author.name", "publisher.name": "publisher.name", "publisher.logo.url": "publisher.logo.url"}]]></field>
         </record>
 
         <!-- 7. BlogPosting -->
@@ -199,7 +199,7 @@
 }]]></field>
             <field name="required_fields_json"><![CDATA[["headline", "author", "datePublished"]]]></field>
             <field name="optional_fields_json"><![CDATA[["description", "image", "publisher", "dateModified", "url", "inLanguage"]]]></field>
-            <field name="auto_mapping_json"><![CDATA[{"headline": "name", "description": "description", "image": "image", "url": "url", "inLanguage": "inLanguage"}]]></field>
+            <field name="auto_mapping_json"><![CDATA[{"headline": "name", "description": "description", "image": "image", "url": "url", "inLanguage": "inLanguage", "datePublished": "datePublished", "dateModified": "dateModified", "author.name": "author.name", "publisher.name": "publisher.name"}]]></field>
         </record>
 
         <!-- 8. Service -->

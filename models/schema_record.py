@@ -91,6 +91,15 @@ def _to_relative_path(url_or_path):
     return url_or_path
 
 
+def _datetime_to_schema(value):
+    if not value:
+        return ''
+    try:
+        return fields.Datetime.to_datetime(value).replace(microsecond=0).isoformat()
+    except Exception:
+        return str(value)
+
+
 def _infer_schema_field_type(field_key):
     key = (field_key or '').lower()
     last_part = key.split('.')[-1]
@@ -354,6 +363,13 @@ class MidvexSchemaRecord(models.Model):
             settings_base = settings._get_base_url(self.website_id)
             if settings_base:
                 return settings_base
+        try:
+            from odoo.http import request
+            request_base = getattr(request.httprequest, 'url_root', '') or ''
+            if request_base:
+                return request_base.rstrip('/')
+        except Exception:
+            pass
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
         if base_url:
             return base_url.rstrip('/')
@@ -368,6 +384,39 @@ class MidvexSchemaRecord(models.Model):
             return target
         base = self._get_base_url()
         return base + target if base else target
+
+    def _to_absolute_url(self, url_or_path):
+        self.ensure_one()
+        value = (url_or_path or '').strip()
+        if not value:
+            return ''
+        if _URL_RE.match(value):
+            return value
+        if value.startswith('//'):
+            return 'https:' + value
+        if not value.startswith('/'):
+            value = '/' + value
+        base = self._get_base_url()
+        return base + value if base else value
+
+    def _get_schema_settings(self):
+        self.ensure_one()
+        return self.env['midvex.schema.settings'].search([
+            ('website_id', '=', self.website_id.id),
+        ], limit=1)
+
+    def _get_default_image_url(self):
+        self.ensure_one()
+        settings = self._get_schema_settings()
+        if settings and settings.default_image_url:
+            return self._to_absolute_url(settings.default_image_url)
+        return ''
+
+    def _get_company_name(self):
+        self.ensure_one()
+        if self.website_id and 'company_id' in self.website_id._fields and self.website_id.company_id:
+            return self.website_id.company_id.name
+        return self.env.company.name
 
     def _get_token_context(self):
         self.ensure_one()
@@ -510,9 +559,14 @@ class MidvexSchemaRecord(models.Model):
                 for field_path in self.schema_template_id.get_required_fields():
                     val = _get_nested_value(data, field_path)
                     if val is None or val == '' or val == [] or val == {}:
-                        errors.append(
-                            f'Required field "{field_path}" is missing or empty.'
-                        )
+                        if field_path == 'image':
+                            warnings.append(
+                                'Field "image" is empty. Add a page SEO image or configure Global Website Schema default image.'
+                            )
+                        else:
+                            errors.append(
+                                f'Required field "{field_path}" is missing or empty.'
+                            )
 
             # --- Schema-type-specific checks (also used when no template) ---
             if self.schema_type == 'Product':
@@ -686,10 +740,25 @@ class MidvexSchemaRecord(models.Model):
             return False
 
         view = page.view_id
-        meta_title = (view.name or '') if view else ''
+        meta_title = ''
         meta_description = ''
+        image = ''
         if view:
+            meta_title = (
+                getattr(view, 'website_meta_title', '') or
+                getattr(view, 'name', '') or
+                getattr(page, 'name', '')
+            )
             meta_description = getattr(view, 'website_meta_description', '') or ''
+            image = (
+                getattr(view, 'website_meta_og_img', '') or
+                getattr(view, 'website_meta_image', '') or
+                getattr(view, 'website_meta_og_image', '')
+            )
+        if image:
+            image = self._to_absolute_url(image)
+        else:
+            image = self._get_default_image_url()
 
         candidates = {
             'name': meta_title,
@@ -697,21 +766,30 @@ class MidvexSchemaRecord(models.Model):
             'url': self._get_absolute_target_url() or self.target_url or '',
             'inLanguage': self.lang_code,
         }
-        if view:
-            image = (
-                getattr(view, 'website_meta_og_img', '') or
-                getattr(view, 'website_meta_image', '') or
-                getattr(view, 'website_meta_og_image', '')
-            )
-            if image:
-                candidates['image'] = image
+        if image:
+            candidates['image'] = image
+
+        if self.schema_type in ('Article', 'BlogPosting'):
+            author_name = ''
+            if view and getattr(view, 'create_uid', False):
+                author_name = view.create_uid.name
+            candidates.update({
+                'headline': meta_title,
+                'datePublished': _datetime_to_schema(getattr(view, 'create_date', False) if view else page.create_date),
+                'dateModified': _datetime_to_schema(getattr(view, 'write_date', False) if view else page.write_date),
+                'author.name': author_name or self._get_company_name(),
+                'publisher.name': self._get_company_name(),
+            })
+            settings = self._get_schema_settings()
+            logo = settings.logo_url if settings and settings.logo_url else ''
+            if logo:
+                candidates['publisher.logo.url'] = self._to_absolute_url(logo)
 
         if self.schema_type == 'Product':
-            settings = self.env['midvex.schema.settings'].search([
-                ('website_id', '=', self.website_id.id),
-                ('enable_global_schema', '=', True),
-            ], limit=1)
+            settings = self._get_schema_settings()
             base = settings._get_base_url(self.website_id) if settings else self._get_base_url()
+            if not base:
+                base = self._get_base_url()
             if base:
                 candidates.setdefault('brand.@id', base + '/#organization')
                 candidates.setdefault('manufacturer.@id', base + '/#organization')
@@ -731,12 +809,26 @@ class MidvexSchemaRecord(models.Model):
             field_type = _infer_schema_field_type(field_key)
             existing = self.field_value_ids.filtered(lambda v: v.field_key == field_key)
             if existing:
+                vals = {'field_type': field_type}
                 if field_type == 'url':
-                    existing[0].write({'value_url': value})
+                    vals.update({
+                        'value_url': self._to_absolute_url(value),
+                        'value_char': False,
+                        'value_text': False,
+                    })
                 elif field_type == 'text':
-                    existing[0].write({'value_text': value})
+                    vals.update({
+                        'value_text': value,
+                        'value_char': False,
+                        'value_url': False,
+                    })
                 else:
-                    existing[0].write({'value_char': value, 'field_type': 'char'})
+                    vals.update({
+                        'value_char': value,
+                        'value_text': False,
+                        'value_url': False,
+                    })
+                existing[0].write(vals)
             else:
                 self.env['midvex.schema.field.value'].create({
                     'schema_record_id': self.id,
@@ -745,7 +837,7 @@ class MidvexSchemaRecord(models.Model):
                     'field_type': field_type,
                     'value_char': value if field_type == 'char' else False,
                     'value_text': value if field_type == 'text' else False,
-                    'value_url': value if field_type == 'url' else False,
+                    'value_url': self._to_absolute_url(value) if field_type == 'url' else False,
                     'lang_code': False,
                 })
         return True

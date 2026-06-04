@@ -251,6 +251,75 @@ class TestSchemaRecord(TransactionCase):
         self.assertTrue(url_field)
         self.assertTrue(url_field.value_url.startswith('https://example.com/'))
 
+    def test_auto_populate_makes_relative_seo_image_absolute(self):
+        self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'https://example.com')
+        self.website.domain = False
+        page = self.env['website.page'].search([], limit=1)
+        if page.view_id and 'website_meta_og_img' in page.view_id._fields:
+            page.view_id.write({'website_meta_og_img': '/web/image/123'})
+        record = self.env['midvex.schema.record'].create({
+            'name': 'Relative Image Schema',
+            'website_id': self.website.id,
+            'target_type': 'page',
+            'website_page_id': page.id,
+            'target_url': page.url or '/relative-image-schema',
+            'lang_code': 'en',
+            'schema_type': 'WebPage',
+        })
+        record.action_auto_populate()
+        image_field = record.field_value_ids.filtered(lambda line: line.field_key == 'image')[:1]
+        if image_field:
+            self.assertEqual(image_field.value_url, 'https://example.com/web/image/123')
+
+    def test_auto_populate_uses_default_image_when_page_has_no_seo_image(self):
+        self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'https://example.com')
+        self.website.domain = False
+        settings = self.env['midvex.schema.settings'].search([('website_id', '=', self.website.id)], limit=1)
+        if not settings:
+            settings = self.env['midvex.schema.settings'].create({'website_id': self.website.id})
+        settings.default_image_url = '/web/image/default-schema-image'
+        page = self.env['website.page'].search([], limit=1)
+        if page.view_id:
+            for fname in ('website_meta_og_img', 'website_meta_image', 'website_meta_og_image'):
+                if fname in page.view_id._fields:
+                    page.view_id.write({fname: False})
+        record = self.env['midvex.schema.record'].create({
+            'name': 'Default Image Article',
+            'website_id': self.website.id,
+            'target_type': 'page',
+            'website_page_id': page.id,
+            'target_url': page.url or '/default-image-article',
+            'lang_code': 'en',
+            'schema_template_id': self.env.ref('midvex_schema_manager.schema_template_article').id,
+        })
+        record.action_auto_populate()
+        image_field = record.field_value_ids.filtered(lambda line: line.field_key == 'image')[:1]
+        self.assertTrue(image_field)
+        self.assertEqual(image_field.value_url, 'https://example.com/web/image/default-schema-image')
+
+    def test_article_auto_populate_dates_and_description_field_row(self):
+        self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'https://example.com')
+        page = self.env['website.page'].search([], limit=1)
+        if page.view_id and 'website_meta_description' in page.view_id._fields:
+            page.view_id.write({'website_meta_description': 'SEO description from page settings'})
+        record = self.env['midvex.schema.record'].create({
+            'name': 'Article Metadata',
+            'website_id': self.website.id,
+            'target_type': 'page',
+            'website_page_id': page.id,
+            'target_url': page.url or '/article-metadata',
+            'lang_code': 'en',
+            'schema_template_id': self.env.ref('midvex_schema_manager.schema_template_article').id,
+        })
+        record.action_auto_populate()
+        description = record.field_value_ids.filtered(lambda line: line.field_key == 'description')[:1]
+        date_published = record.field_value_ids.filtered(lambda line: line.field_key == 'datePublished')[:1]
+        author = record.field_value_ids.filtered(lambda line: line.field_key == 'author.name')[:1]
+        self.assertTrue(description)
+        self.assertEqual(description.value_text, 'SEO description from page settings')
+        self.assertTrue(date_published.value_char)
+        self.assertTrue(author.value_char)
+
     def test_field_type_inference(self):
         self.assertEqual(_infer_schema_field_type('url'), 'url')
         self.assertEqual(_infer_schema_field_type('publisher.logo.url'), 'url')
