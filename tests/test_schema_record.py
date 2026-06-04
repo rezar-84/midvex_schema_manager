@@ -218,6 +218,13 @@ class TestSchemaRecord(TransactionCase):
         })
         self.assertEqual(wizard.target_url, '/test-product')
 
+    def test_create_page_wizard_rejects_backend_rpc_paths(self):
+        wizard_model = self.env['midvex.schema.page.wizard']
+        self.assertTrue(wizard_model._is_backend_request_path('/web/dataset/call_kw/midvex.schema.page.wizard/onchange'))
+        self.assertTrue(wizard_model._is_backend_request_path('/web/action/load'))
+        self.assertFalse(wizard_model._is_backend_request_path('/products/sample-product'))
+        self.assertFalse(wizard_model._is_backend_request_path('/tr/products/sample-product'))
+
     def test_field_type_inference(self):
         self.assertEqual(_infer_schema_field_type('url'), 'url')
         self.assertEqual(_infer_schema_field_type('publisher.logo.url'), 'url')

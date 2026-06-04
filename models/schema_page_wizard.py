@@ -31,6 +31,38 @@ class MidvexSchemaPageWizard(models.TransientModel):
     auto_populate = fields.Boolean('Auto-fill from page SEO metadata', default=True)
 
     @api.model
+    def _is_backend_request_path(self, path):
+        if not path:
+            return False
+        backend_prefixes = (
+            '/web',
+            '/mail',
+            '/bus',
+            '/longpolling',
+            '/websocket',
+            '/report',
+        )
+        return path == '/web' or any(path.startswith(prefix + '/') for prefix in backend_prefixes)
+
+    @api.model
+    def _get_request_candidate_url(self):
+        """Return a frontend URL/path from the active request, never an RPC path."""
+        try:
+            from odoo.http import request
+            request_path = getattr(request.httprequest, 'path', '') or ''
+            if request_path and not self._is_backend_request_path(request_path):
+                return request_path
+
+            referrer = getattr(request.httprequest, 'referrer', '') or ''
+            if referrer:
+                ref_path = urlparse(referrer).path or ''
+                if ref_path and not self._is_backend_request_path(ref_path):
+                    return referrer
+        except Exception:
+            return ''
+        return ''
+
+    @api.model
     def default_get(self, fields_list):
         vals = super().default_get(fields_list)
         website = self.env['website'].browse(vals.get('website_id')) if vals.get('website_id') else self.env['website'].get_current_website()
@@ -43,13 +75,13 @@ class MidvexSchemaPageWizard(models.TransientModel):
             ''
         )
         if not raw_url:
+            raw_url = self._get_request_candidate_url()
             try:
                 from odoo.http import request
-                raw_url = getattr(request.httprequest, 'path', '') or ''
                 if getattr(request, 'lang', None) and request.lang.code:
                     vals.setdefault('lang_code', _get_schema_lang_code(request.lang.code))
             except Exception:
-                raw_url = ''
+                pass
         if raw_url:
             path = urlparse(raw_url).path if raw_url.startswith('http') else raw_url
             path = path or '/'
