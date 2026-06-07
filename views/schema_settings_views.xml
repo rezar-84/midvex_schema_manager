@@ -10,6 +10,9 @@
                 <header>
                     <button string="Validate" name="action_validate_global_schema"
                             type="object" class="btn-primary"/>
+                    <button string="Import / Export" type="action"
+                            name="%(action_midvex_schema_config_transfer_wizard)d"
+                            class="btn-secondary"/>
                     <field name="validation_status" widget="statusbar"
                            statusbar_visible="draft,valid,warning,error"/>
                 </header>

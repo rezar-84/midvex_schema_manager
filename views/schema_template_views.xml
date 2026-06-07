@@ -12,6 +12,9 @@
                     <button string="Duplicate Template" name="action_duplicate_template" type="object" class="btn-secondary"/>
                     <button string="Format JSON" name="action_format_json_fields" type="object" class="btn-secondary"/>
                     <button string="Validate JSON" name="action_validate_json_fields" type="object" class="btn-secondary"/>
+                    <button string="Import / Export" type="action"
+                            name="%(action_midvex_schema_config_transfer_wizard)d"
+                            class="btn-secondary"/>
                 </header>
                 <sheet>
                     <widget name="web_ribbon" title="System Template"

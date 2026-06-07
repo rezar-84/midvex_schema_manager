@@ -9,3 +9,4 @@ from . import schema_coverage
 from . import schema_record
 from . import schema_page_wizard
 from . import schema_batch_wizard
+from . import schema_config_transfer_wizard

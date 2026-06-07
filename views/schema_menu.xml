@@ -69,4 +69,11 @@
               sequence="8"
               groups="midvex_schema_manager.group_midvex_schema_manager"/>
 
+    <menuitem id="menu_midvex_schema_config_transfer"
+              name="Import / Export Configs"
+              parent="menu_midvex_structured_data_root"
+              action="action_midvex_schema_config_transfer_wizard"
+              sequence="9"
+              groups="midvex_schema_manager.group_midvex_schema_manager"/>
+
 </odoo>

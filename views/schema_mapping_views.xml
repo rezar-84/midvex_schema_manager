@@ -9,6 +9,9 @@
                 <header>
                     <button name="action_load_template_fields" string="Generate Lines from Template" type="object" class="btn-primary"/>
                     <button name="action_load_sample_mapping" string="Load Sample Mapping" type="object" class="btn-secondary"/>
+                    <button string="Import / Export" type="action"
+                            name="%(action_midvex_schema_config_transfer_wizard)d"
+                            class="btn-secondary"/>
                 </header>
                 <sheet>
                     <div class="alert alert-info" role="alert">

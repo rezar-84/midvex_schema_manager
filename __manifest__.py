@@ -15,6 +15,7 @@ Features:
 - Schema template library with global, page, product, FAQ, breadcrumb, local business and Google Merchant templates
 - Safe Drupal-style token resolver and model-to-schema mapping helpers
 - Coverage report and batch operations
+- Import/export configuration using Excel workbooks or CSV ZIP archives
 - Manual JSON override for admins (validated on save)
 - Auto-fill from page SEO metadata
 - Internal JSON-LD validation with Google Rich Results Test link
@@ -40,6 +41,7 @@ Features:
         'data/schema_template_data.xml',
         'data/schema_cron.xml',
         # 3. Backend views (actions before menus)
+        'views/schema_config_transfer_wizard_views.xml',
         'views/schema_settings_views.xml',
         'views/schema_template_views.xml',
         'views/schema_mapping_views.xml',
