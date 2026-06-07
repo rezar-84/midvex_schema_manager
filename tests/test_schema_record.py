@@ -1,5 +1,6 @@
 from odoo.tests.common import TransactionCase
 from odoo.tests import tagged
+from odoo.exceptions import ValidationError
 
 from ..models.schema_record import (
     _get_schema_lang_code,
@@ -7,6 +8,7 @@ from ..models.schema_record import (
     _set_nested_value,
     _get_nested_value,
     _to_relative_path,
+    _normalize_schema_target_url,
     _infer_schema_field_type,
 )
 from ..models.json_utils import _safe_json_dumps, _build_jsonld_script
@@ -48,6 +50,11 @@ class TestSchemaRecord(TransactionCase):
         self.assertEqual(_to_relative_path('https://example.com/products'), '/products')
         self.assertEqual(_to_relative_path('/products'), '/products')
         self.assertEqual(_to_relative_path(''), '')
+
+    def test_normalize_schema_target_url(self):
+        self.assertEqual(_normalize_schema_target_url('https://example.com/products/'), '/products')
+        self.assertEqual(_normalize_schema_target_url('products'), '/products')
+        self.assertEqual(_normalize_schema_target_url('/'), '/')
 
     def test_absolute_target_url_falls_back_to_web_base_url(self):
         self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'https://example.com')
@@ -396,3 +403,51 @@ class TestSchemaRecord(TransactionCase):
             'schema_type': 'Article',  # different type, no duplicate
         })
         self.assertEqual(record2.check_duplicate_schema(), '')
+
+    def test_same_schema_type_allowed_on_different_urls(self):
+        self.env['midvex.schema.record'].create({
+            'name': 'Article One',
+            'website_id': self.website.id,
+            'target_type': 'url',
+            'target_url': '/article-one',
+            'lang_code': 'en',
+            'schema_type': 'Article',
+        })
+        record = self.env['midvex.schema.record'].create({
+            'name': 'Article Two',
+            'website_id': self.website.id,
+            'target_type': 'url',
+            'target_url': '/article-two',
+            'lang_code': 'en',
+            'schema_type': 'Article',
+        })
+        self.assertEqual(record.check_duplicate_schema(), '')
+
+    def test_url_schema_requires_url_before_duplicate_check(self):
+        with self.assertRaises(ValidationError):
+            self.env['midvex.schema.record'].create({
+                'name': 'Missing URL Article',
+                'website_id': self.website.id,
+                'target_type': 'url',
+                'lang_code': 'en',
+                'schema_type': 'Article',
+            })
+
+    def test_absolute_url_duplicate_normalizes_to_relative_path(self):
+        self.env['midvex.schema.record'].create({
+            'name': 'Normalized Article',
+            'website_id': self.website.id,
+            'target_type': 'url',
+            'target_url': 'https://example.com/normalized-article/',
+            'lang_code': 'en',
+            'schema_type': 'Article',
+        })
+        with self.assertRaises(ValidationError):
+            self.env['midvex.schema.record'].create({
+                'name': 'Duplicate Normalized Article',
+                'website_id': self.website.id,
+                'target_type': 'url',
+                'target_url': '/normalized-article',
+                'lang_code': 'en',
+                'schema_type': 'Article',
+            })

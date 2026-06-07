@@ -91,6 +91,18 @@ def _to_relative_path(url_or_path):
     return url_or_path
 
 
+def _normalize_schema_target_url(url_or_path):
+    """Return the canonical stored URL target used for matching records."""
+    path = _to_relative_path((url_or_path or '').strip())
+    if not path:
+        return ''
+    if not path.startswith('/'):
+        path = '/' + path
+    if path != '/':
+        path = path.rstrip('/')
+    return path
+
+
 def _datetime_to_schema(value):
     if not value:
         return ''
@@ -287,19 +299,7 @@ class MidvexSchemaRecord(models.Model):
                     'lang_code', 'schema_type')
     def _check_unique_schema_context(self):
         for rec in self:
-            domain = [
-                ('id', '!=', rec.id),
-                ('active', '=', True),
-                ('website_id', '=', rec.website_id.id),
-                ('lang_code', '=', rec.lang_code),
-                ('schema_type', '=', rec.schema_type),
-                ('target_type', '=', rec.target_type),
-            ]
-            if rec.target_type == 'page' and rec.website_page_id:
-                domain.append(('website_page_id', '=', rec.website_page_id.id))
-            elif rec.target_type == 'url' and rec.target_url:
-                domain.append(('target_url', '=', rec.target_url))
-
+            domain = rec._get_duplicate_domain()
             if self.search_count(domain):
                 raise ValidationError(
                     f'A schema record with website "{rec.website_id.name}", '
@@ -963,11 +963,19 @@ class MidvexSchemaRecord(models.Model):
         )
 
         # URL matching: raw/normalized relative paths and absolute equivalents
-        url_candidates = {current_path, raw_path, _to_relative_path(current_path)}
+        url_candidates = {
+            current_path,
+            raw_path,
+            _to_relative_path(current_path),
+            _normalize_schema_target_url(current_path),
+            _normalize_schema_target_url(raw_path),
+        }
         if base_url:
             url_candidates.update({
                 base_url + current_path if current_path else '',
                 base_url + raw_path if raw_path else '',
+                _normalize_schema_target_url(base_url + current_path) if current_path else '',
+                _normalize_schema_target_url(base_url + raw_path) if raw_path else '',
             })
         url_search_paths = list(url_candidates - {''})
         url_records = self.sudo().search(
@@ -1070,20 +1078,7 @@ class MidvexSchemaRecord(models.Model):
 
     def check_duplicate_schema(self):
         self.ensure_one()
-        domain = [
-            ('id', '!=', self.id or 0),
-            ('active', '=', True),
-            ('website_id', '=', self.website_id.id),
-            ('lang_code', '=', self.lang_code),
-            ('schema_type', '=', self.schema_type),
-        ]
-        if self.target_type == 'page' and self.website_page_id:
-            domain.append(('website_page_id', '=', self.website_page_id.id))
-        elif self.target_type == 'url' and self.target_url:
-            domain.append(('target_url', '=', self.target_url))
-        elif self.target_type == 'global':
-            domain.append(('target_type', '=', 'global'))
-
+        domain = self._get_duplicate_domain()
         duplicates = self.search(domain)
         warnings = []
         if duplicates:
@@ -1099,6 +1094,30 @@ class MidvexSchemaRecord(models.Model):
                     'Global Website Schema already renders Organization/WebSite data for this website.'
                 )
         return '\n'.join(warnings)
+
+    def _get_duplicate_domain(self):
+        self.ensure_one()
+        domain = [
+            ('id', '!=', self.id or 0),
+            ('active', '=', True),
+            ('website_id', '=', self.website_id.id),
+            ('lang_code', '=', self.lang_code),
+            ('schema_type', '=', self.schema_type),
+            ('target_type', '=', self.target_type),
+        ]
+        if self.target_type == 'global':
+            return domain
+        if self.target_type == 'page':
+            if self.website_page_id:
+                return domain + [('website_page_id', '=', self.website_page_id.id)]
+            if self.target_url:
+                return domain + [('target_url', '=', self.target_url)]
+            raise ValidationError('Website Page or Target URL is required for page schema records.')
+        if self.target_type == 'url':
+            if not self.target_url:
+                raise ValidationError('Target URL is required for custom URL schema records.')
+            return domain + [('target_url', '=', self.target_url)]
+        return domain
 
     @api.onchange('schema_template_id')
     def _onchange_schema_template_id(self):
@@ -1125,7 +1144,7 @@ class MidvexSchemaRecord(models.Model):
     @api.onchange('website_page_id')
     def _onchange_website_page_id(self):
         if self.website_page_id and not self.target_url:
-            self.target_url = self.website_page_id.url
+            self.target_url = _normalize_schema_target_url(self.website_page_id.url)
 
     def _prepare_template_field_commands(self, required=True, optional=False, ignore_existing=False):
         self.ensure_one()
@@ -1201,6 +1220,8 @@ class MidvexSchemaRecord(models.Model):
                     vals['schema_type'] = template.schema_type
                 if not vals.get('target_type'):
                     vals['target_type'] = template.get_recommended_target_type()
+            if vals.get('target_url'):
+                vals['target_url'] = _normalize_schema_target_url(vals['target_url'])
         records = super().create(vals_list)
         for record in records:
             if record.schema_template_id and not record.field_value_ids:
@@ -1220,6 +1241,8 @@ class MidvexSchemaRecord(models.Model):
         if vals.get('schema_template_id'):
             template = self.env['midvex.schema.template'].browse(vals['schema_template_id'])
             vals.setdefault('schema_type', template.schema_type)
+        if vals.get('target_url'):
+            vals['target_url'] = _normalize_schema_target_url(vals['target_url'])
         result = super().write(vals)
         if self.env.context.get('_midvex_skip_dup_check'):
             return result
