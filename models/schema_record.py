@@ -32,6 +32,29 @@ def _get_schema_lang_code(odoo_lang_code):
     return odoo_lang_code.split('_')[0].lower()
 
 
+def _get_odoo_lang_code(schema_lang_code, website=None):
+    """Return an installed Odoo lang code matching a schema lang code.
+
+    Schema records store compact values such as "en" or "tr"; translated
+    Odoo fields need locale codes such as "en_US" or "tr_TR".
+    """
+    if not schema_lang_code:
+        return ''
+    schema_code = schema_lang_code.replace('-', '_').split('_')[0].lower()
+    env = website.env if website else None
+    if not env:
+        return ''
+    langs = website.language_ids if website else env['res.lang']
+    if not langs:
+        langs = env['res.lang'].search([('active', '=', True)])
+    for lang in langs:
+        lang_prefix = (lang.code or '').split('_')[0].lower()
+        url_code = (getattr(lang, 'url_code', '') or '').lower()
+        if schema_code in (lang_prefix, url_code):
+            return lang.code
+    return ''
+
+
 def _get_active_language_url_codes(website):
     """Return a set of all language URL codes active on *website*.
 
@@ -801,6 +824,9 @@ class MidvexSchemaRecord(models.Model):
         page = self.website_page_id
         if not page:
             return {}
+        odoo_lang_code = _get_odoo_lang_code(self.lang_code, self.website_id)
+        if odoo_lang_code:
+            page = page.with_context(lang=odoo_lang_code)
         view = page.view_id
         meta_title = ''
         meta_description = ''
