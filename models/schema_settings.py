@@ -225,28 +225,38 @@ class MidvexSchemaSettings(models.Model):
         return errors, warnings
 
     def action_validate_global_schema(self):
+        messages = []
+        has_errors = False
+        has_warnings = False
         for rec in self:
             errors, warnings = rec._validate_global_schema_data()
             if errors:
                 status = 'error'
                 message = '\n'.join(errors + warnings)
+                has_errors = True
             elif warnings:
                 status = 'warning'
                 message = '\n'.join(warnings)
+                has_warnings = True
             else:
                 status = 'valid'
                 message = 'Global Website Schema is valid.'
+            messages.append(message)
             rec.write({
                 'validation_status': status,
                 'validation_message': message,
             })
+        if len(self) == 1:
+            notification_message = messages[0] if messages else 'Validation complete.'
+        else:
+            notification_message = '%s global schema settings validated.' % len(self)
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': 'Global schema validation',
-                'message': self.validation_message or 'Validation complete.',
-                'type': 'success' if self.validation_status == 'valid' else 'warning',
+                'message': notification_message,
+                'type': 'danger' if has_errors else ('warning' if has_warnings else 'success'),
                 'sticky': False,
             },
         }

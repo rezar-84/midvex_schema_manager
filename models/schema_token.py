@@ -84,7 +84,9 @@ class MidvexSchemaToken(models.AbstractModel):
         if not blog or not getattr(blog, 'exists', lambda: False)():
             return ''
         if 'cover_properties' in blog._fields and blog.cover_properties:
-            return ''
+            match = re.search(r'url\([\'"]?([^\'")]+)[\'"]?\)', blog.cover_properties)
+            if match:
+                return self._record_url(website, match.group(1))
         if 'image_1920' in blog._fields and blog.image_1920:
             return self._record_url(website, '/web/image/blog.post/%s/image_1920' % blog.id)
         return ''

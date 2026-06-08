@@ -53,6 +53,9 @@ class MidvexSchemaBatchWizard(models.TransientModel):
             skipped = 0
             languages = self.website_id.language_ids if self.website_id else self.env['res.lang'].search([('active', '=', True)])
             for record in records:
+                if not record.lang_code:
+                    skipped += len(languages)
+                    continue
                 for lang in languages:
                     lang_code = _get_schema_lang_code(lang.code)
                     if lang_code == record.lang_code or self._schema_exists_for_lang(record, lang_code):

@@ -249,6 +249,23 @@ class MidvexSchemaRecord(models.Model):
     render_target_summary = fields.Char(
         'Render Target', compute='_compute_target_display', store=False
     )
+    website_page_published = fields.Boolean(
+        'Page Published', compute='_compute_website_page_info', store=False
+    )
+    website_page_write_date = fields.Datetime(
+        'Page Last Modified', compute='_compute_website_page_info', store=False
+    )
+    website_page_create_date = fields.Datetime(
+        'Page Created On', compute='_compute_website_page_info', store=False
+    )
+    website_page_write_uid = fields.Many2one(
+        'res.users', string='Page Last Modified By',
+        compute='_compute_website_page_info', store=False
+    )
+    website_page_create_uid = fields.Many2one(
+        'res.users', string='Page Created By',
+        compute='_compute_website_page_info', store=False
+    )
 
     field_value_ids = fields.One2many(
         'midvex.schema.field.value', 'schema_record_id', string='Field Values'
@@ -290,6 +307,21 @@ class MidvexSchemaRecord(models.Model):
             else:
                 rec.render_target_summary = 'Custom URL: %s' % (path or 'No URL set')
                 rec.resolved_url_preview = path if _URL_RE.match(path or '') else (base + path if base and path else path)
+
+    @api.depends('website_page_id')
+    def _compute_website_page_info(self):
+        for rec in self:
+            page = rec.website_page_id
+            rec.website_page_published = bool(
+                page and (
+                    getattr(page, 'is_published', False)
+                    or getattr(page, 'website_published', False)
+                )
+            )
+            rec.website_page_write_date = page.write_date if page else False
+            rec.website_page_create_date = page.create_date if page else False
+            rec.website_page_write_uid = page.write_uid if page else False
+            rec.website_page_create_uid = page.create_uid if page else False
 
     # ------------------------------------------------------------------
     # Constraints
@@ -721,6 +753,30 @@ class MidvexSchemaRecord(models.Model):
             'target': 'new',
         }
 
+    def action_open_website_url(self):
+        self.ensure_one()
+        url = self._get_absolute_target_url()
+        if not url:
+            raise ValidationError('No target URL is configured for this schema record.')
+        return {
+            'type': 'ir.actions.act_url',
+            'url': url,
+            'target': 'new',
+        }
+
+    def action_open_website_page_backend(self):
+        self.ensure_one()
+        if not self.website_page_id:
+            raise ValidationError('No website page is attached to this schema record.')
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Website Page',
+            'res_model': 'website.page',
+            'view_mode': 'form',
+            'res_id': self.website_page_id.id,
+            'target': 'current',
+        }
+
     def action_open_lang_wizard(self):
         self.ensure_one()
         return {
@@ -734,10 +790,17 @@ class MidvexSchemaRecord(models.Model):
 
     def action_auto_populate(self):
         self.ensure_one()
+        candidates = self._get_auto_populate_candidates()
+        if not candidates:
+            return False
+        self._apply_auto_populate_candidates(candidates)
+        return True
+
+    def _get_auto_populate_candidates(self):
+        self.ensure_one()
         page = self.website_page_id
         if not page:
-            return False
-
+            return {}
         view = page.view_id
         meta_title = ''
         meta_description = ''
@@ -769,14 +832,12 @@ class MidvexSchemaRecord(models.Model):
             candidates['image'] = image
 
         if self.schema_type in ('Article', 'BlogPosting'):
-            author_name = ''
-            if view and getattr(view, 'create_uid', False):
-                author_name = view.create_uid.name
+            author_name = self._get_company_name()
             candidates.update({
                 'headline': meta_title,
                 'datePublished': _datetime_to_schema(getattr(view, 'create_date', False) if view else page.create_date),
                 'dateModified': _datetime_to_schema(getattr(view, 'write_date', False) if view else page.write_date),
-                'author.name': author_name or self._get_company_name(),
+                'author.name': author_name,
                 'publisher.name': self._get_company_name(),
             })
             settings = self._get_schema_settings()
@@ -801,33 +862,38 @@ class MidvexSchemaRecord(models.Model):
             for schema_field, odoo_key in self.schema_template_id.get_auto_mapping().items():
                 if odoo_key in candidates and candidates[odoo_key]:
                     candidates[schema_field] = candidates[odoo_key]
+        return candidates
 
+    def _get_field_value_vals(self, field_key, value):
+        field_type = _infer_schema_field_type(field_key)
+        vals = {
+            'field_type': field_type,
+            'value_char': False,
+            'value_text': False,
+            'value_html': False,
+            'value_url': False,
+            'value_boolean': False,
+            'value_integer': False,
+            'value_float': False,
+            'value_json': False,
+        }
+        if field_type == 'url':
+            vals['value_url'] = self._to_absolute_url(value)
+        elif field_type == 'text':
+            vals['value_text'] = value
+        else:
+            vals['value_char'] = value
+        return vals
+
+    def _apply_auto_populate_candidates(self, candidates):
+        self.ensure_one()
         for field_key, value in candidates.items():
             if not value:
                 continue
             field_type = _infer_schema_field_type(field_key)
             existing = self.field_value_ids.filtered(lambda v: v.field_key == field_key)
             if existing:
-                vals = {'field_type': field_type}
-                if field_type == 'url':
-                    vals.update({
-                        'value_url': self._to_absolute_url(value),
-                        'value_char': False,
-                        'value_text': False,
-                    })
-                elif field_type == 'text':
-                    vals.update({
-                        'value_text': value,
-                        'value_char': False,
-                        'value_url': False,
-                    })
-                else:
-                    vals.update({
-                        'value_char': value,
-                        'value_text': False,
-                        'value_url': False,
-                    })
-                existing[0].write(vals)
+                existing[0].write(self._get_field_value_vals(field_key, value))
             else:
                 self.env['midvex.schema.field.value'].create({
                     'schema_record_id': self.id,
@@ -839,7 +905,6 @@ class MidvexSchemaRecord(models.Model):
                     'value_url': self._to_absolute_url(value) if field_type == 'url' else False,
                     'lang_code': False,
                 })
-        return True
 
     def action_add_required_fields(self):
         for record in self:
@@ -1067,6 +1132,7 @@ class MidvexSchemaRecord(models.Model):
         if not url:
             return []
         path = _to_relative_path(url).split('?')[0].rstrip('/')
+        path = _strip_language_prefix(path, set())
         parts = [p for p in path.split('/') if p]
         crumbs = [{'name': 'Home', 'url': '/'}]
         accumulated = ''
@@ -1103,20 +1169,42 @@ class MidvexSchemaRecord(models.Model):
             ('website_id', '=', self.website_id.id),
             ('lang_code', '=', self.lang_code),
             ('schema_type', '=', self.schema_type),
-            ('target_type', '=', self.target_type),
         ]
         if self.target_type == 'global':
-            return domain
+            return domain + [('target_type', '=', 'global')]
         if self.target_type == 'page':
             if self.website_page_id:
-                return domain + [('website_page_id', '=', self.website_page_id.id)]
+                urls = {
+                    _normalize_schema_target_url(self.website_page_id.url),
+                    _normalize_schema_target_url(self.target_url),
+                } - {''}
+                return domain + [
+                    ('target_type', 'in', ['page', 'url']),
+                    '|',
+                    ('website_page_id', '=', self.website_page_id.id),
+                    ('target_url', 'in', list(urls) or ['__no_url__']),
+                ]
             if self.target_url:
-                return domain + [('target_url', '=', self.target_url)]
+                normalized_url = _normalize_schema_target_url(self.target_url)
+                pages = self.env['website.page'].search([('url', '=', normalized_url)])
+                return domain + [
+                    ('target_type', 'in', ['page', 'url']),
+                    '|',
+                    ('target_url', '=', normalized_url),
+                    ('website_page_id', 'in', pages.ids or [0]),
+                ]
             raise ValidationError('Website Page or Target URL is required for page schema records.')
         if self.target_type == 'url':
             if not self.target_url:
                 raise ValidationError('Target URL is required for custom URL schema records.')
-            return domain + [('target_url', '=', self.target_url)]
+            normalized_url = _normalize_schema_target_url(self.target_url)
+            pages = self.env['website.page'].search([('url', '=', normalized_url)])
+            return domain + [
+                ('target_type', 'in', ['page', 'url']),
+                '|',
+                ('target_url', '=', normalized_url),
+                ('website_page_id', 'in', pages.ids or [0]),
+            ]
         return domain
 
     @api.onchange('schema_template_id')
@@ -1143,8 +1231,31 @@ class MidvexSchemaRecord(models.Model):
 
     @api.onchange('website_page_id')
     def _onchange_website_page_id(self):
-        if self.website_page_id and not self.target_url:
+        if self.website_page_id:
             self.target_url = _normalize_schema_target_url(self.website_page_id.url)
+            if self.auto_populate:
+                commands = []
+                candidates = self._get_auto_populate_candidates()
+                for field_key, value in candidates.items():
+                    if not value:
+                        continue
+                    existing = self.field_value_ids.filtered(lambda v: v.field_key == field_key)[:1]
+                    vals = self._get_field_value_vals(field_key, value)
+                    if existing:
+                        commands.append(Command.update(existing.id, vals))
+                    else:
+                        field_type = _infer_schema_field_type(field_key)
+                        commands.append(Command.create({
+                            'field_key': field_key,
+                            'field_label': _schema_field_label(field_key),
+                            'field_type': field_type,
+                            'value_char': value if field_type == 'char' else False,
+                            'value_text': value if field_type == 'text' else False,
+                            'value_url': self._to_absolute_url(value) if field_type == 'url' else False,
+                            'lang_code': False,
+                        }))
+                if commands:
+                    self.field_value_ids = commands
 
     def _prepare_template_field_commands(self, required=True, optional=False, ignore_existing=False):
         self.ensure_one()
@@ -1183,12 +1294,21 @@ class MidvexSchemaRecord(models.Model):
         for record in self:
             if not record.schema_template_id:
                 continue
-            commands = [Command.clear()] + record._prepare_template_field_commands(
-                required=True, optional=False, ignore_existing=True
-            )
-            record.write({'field_value_ids': commands})
+            template_keys = set(record.schema_template_id.get_required_fields())
             if record.schema_template_id.load_optional_fields_by_default:
-                record.action_add_optional_fields()
+                template_keys.update(record.schema_template_id.get_optional_fields())
+            required_keys = set(record.schema_template_id.get_required_fields())
+            for line in record.field_value_ids.filtered(lambda item: item.field_key in template_keys):
+                line.write({
+                    'field_label': _schema_field_label(line.field_key),
+                    'field_type': _infer_schema_field_type(line.field_key),
+                    'required': line.field_key in required_keys,
+                })
+            commands = record._prepare_template_field_commands(
+                required=True, optional=record.schema_template_id.load_optional_fields_by_default
+            )
+            if commands:
+                record.write({'field_value_ids': commands})
         return True
 
     @api.model

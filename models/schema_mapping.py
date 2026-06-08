@@ -12,8 +12,8 @@ class MidvexSchemaMapping(models.Model):
     name = fields.Char(required=True)
     target_model_id = fields.Many2one(
         'ir.model', string='Target Model', required=True, ondelete='cascade',
-        domain="[('model', 'in', ['product.template', 'product.product', 'blog.post', 'event.event', 'slide.channel', 'website.page', 'res.partner'])]",
-        help='Odoo model to map, e.g. Product Template, Blog Post'
+        domain="[('transient', '=', False)]",
+        help='Odoo model to map, e.g. Product Template, Blog Post, Website Page, or a custom model.'
     )
     target_model = fields.Char(
         string='Target Model Technical Name',
@@ -52,6 +52,7 @@ class MidvexSchemaMapping(models.Model):
                 vals['target_model_id'] = model_rec.id if model_rec else False
                 # Do not write string to target_model directly if it's computed/stored
                 del vals['target_model']
+            self._resolve_nested_line_field_names(vals)
         return super().create(vals_list)
 
     def write(self, vals):
@@ -59,7 +60,21 @@ class MidvexSchemaMapping(models.Model):
             model_rec = self.env['ir.model'].search([('model', '=', vals['target_model'])], limit=1)
             vals['target_model_id'] = model_rec.id if model_rec else False
             del vals['target_model']
+        self._resolve_nested_line_field_names(vals)
         return super().write(vals)
+
+    def _resolve_nested_line_field_names(self, vals):
+        model_id = vals.get('target_model_id')
+        if not model_id and self:
+            model_id = self[:1].target_model_id.id
+        if not model_id or not vals.get('line_ids'):
+            return
+        line_model = self.env['midvex.schema.mapping.line']
+        for command in vals.get('line_ids') or []:
+            if not isinstance(command, (list, tuple)) or len(command) < 3:
+                continue
+            if command[0] == Command.CREATE and isinstance(command[2], dict):
+                line_model._resolve_field_name(command[2], model_id)
 
     @api.model
     def _safe_read_field(self, record, field_name):
@@ -174,7 +189,7 @@ class MidvexSchemaMapping(models.Model):
             template = self.env['midvex.schema.template'].search([('schema_type', '=', 'BlogPosting')], limit=1)
             f_name = find_field('name')
             f_sub = find_field('subtitle')
-            f_date = find_field('post_date') or find_field('create_date')
+            f_date = find_field('published_date') or find_field('post_date') or find_field('create_date')
             
             lines_vals = [
                 {'schema_field_path': 'headline', 'source_type': 'odoo_field', 'odoo_field_id': f_name.id, 'field_type': 'char'},
@@ -261,13 +276,20 @@ class MidvexSchemaMappingLine(models.Model):
                     model_id = False
                 
                 if model_id:
-                    field_rec = self.env['ir.model.fields'].search([
-                        ('model_id', '=', model_id),
-                        ('name', '=', vals['odoo_field_name'])
-                    ], limit=1)
-                    vals['odoo_field_id'] = field_rec.id if field_rec else False
+                    self._resolve_field_name(vals, model_id)
                 del vals['odoo_field_name']
         return super().create(vals_list)
+
+    @api.model
+    def _resolve_field_name(self, vals, model_id):
+        field_name = vals.get('odoo_field_name')
+        if not field_name or not model_id:
+            return
+        field_rec = self.env['ir.model.fields'].search([
+            ('model_id', '=', model_id),
+            ('name', '=', field_name)
+        ], limit=1)
+        vals['odoo_field_id'] = field_rec.id if field_rec else False
 
     def write(self, vals):
         if 'odoo_field_name' in vals and isinstance(vals['odoo_field_name'], str):

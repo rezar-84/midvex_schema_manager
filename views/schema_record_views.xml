@@ -19,8 +19,8 @@
                             type="object" invisible="not schema_template_id"/>
                     <button string="Add Optional Fields" name="action_add_optional_fields"
                             type="object" invisible="not schema_template_id"/>
-                    <button string="Reset Fields from Template" name="action_reset_fields_from_template"
-                            type="object" invisible="not schema_template_id" confirm="This will replace all field rows from the selected template. Continue?"/>
+                    <button string="Sync Template Fields" name="action_reset_fields_from_template"
+                            type="object" invisible="not schema_template_id" confirm="This will refresh template field rows and add missing template fields without deleting custom rows. Continue?"/>
                     <button string="Create for All Languages" name="action_open_lang_wizard"
                             type="object" class="btn-secondary"/>
                     <field name="validation_status" widget="statusbar"
@@ -330,8 +330,16 @@
                 <field name="name"/>
                 <field name="website_id" optional="show"/>
                 <field name="target_type"/>
+                <field name="website_page_id" optional="show"/>
                 <field name="target_url" optional="show"/>
+                <button name="action_open_website_page_backend" type="object"
+                        string="Open Page" icon="fa-external-link"
+                        invisible="target_type != 'page'"/>
+                <button name="action_open_website_url" type="object"
+                        string="View Website" icon="fa-globe"
+                        invisible="target_type == 'global'"/>
                 <field name="render_target_summary" optional="hide"/>
+                <field name="website_page_published" optional="show"/>
                 <field name="lang_code"/>
                 <field name="schema_template_id" optional="show"/>
                 <field name="schema_type"/>
@@ -343,6 +351,10 @@
                        decoration-muted="validation_status == 'draft'"/>
                 <field name="auto_populate" optional="hide"/>
                 <field name="last_generated_at" optional="show"/>
+                <field name="website_page_write_date" optional="show"/>
+                <field name="website_page_write_uid" optional="show"/>
+                <field name="website_page_create_date" optional="hide"/>
+                <field name="website_page_create_uid" optional="hide"/>
             </list>
         </field>
     </record>
