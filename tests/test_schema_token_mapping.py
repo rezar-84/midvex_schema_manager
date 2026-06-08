@@ -86,6 +86,9 @@ class TestSchemaTokenMapping(TransactionCase):
         self.assertEqual(data['name'], self.website.name)
 
     def test_model_mapping_frontend_rendering(self):
+        if 'product.template' not in self.env.registry:
+            self.skipTest('product.template is not installed')
+
         # 1. Create dummy request-like object
         class DummyHttpRequest:
             def __init__(self):
@@ -144,4 +147,3 @@ class TestSchemaTokenMapping(TransactionCase):
         self.assertIn('"@type": "Product"', res)
         self.assertIn(f'"name": "{product.name}"', res)
         self.assertIn('"price":', res)
-

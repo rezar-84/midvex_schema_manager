@@ -225,6 +225,23 @@ class TestSchemaRecord(TransactionCase):
         self.assertEqual(template.schema_type, 'LocalBusiness')
         self.assertIn('address.streetAddress', template.get_optional_fields())
 
+    def test_template_json_fields_validate_expected_types(self):
+        with self.assertRaises(ValidationError):
+            self.env['midvex.schema.template'].create({
+                'name': 'Invalid Required Fields',
+                'schema_type': 'Thing',
+                'json_template': '{}',
+                'required_fields_json': '{}',
+                'optional_fields_json': '[]',
+                'auto_mapping_json': '{}',
+                'validation_rules_json': '{}',
+            })
+
+    def test_article_template_requires_nested_author_name(self):
+        template = self.env.ref('midvex_schema_manager.schema_template_article')
+        self.assertIn('author.name', template.get_required_fields())
+        self.assertNotIn('author', template.get_required_fields())
+
     def test_create_page_wizard_prefills_target_url_from_context(self):
         wizard = self.env['midvex.schema.page.wizard'].with_context(
             current_url='/test-product'

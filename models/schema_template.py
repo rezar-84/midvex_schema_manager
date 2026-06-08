@@ -127,20 +127,24 @@ class MidvexSchemaTemplate(models.Model):
                     'auto_mapping_json', 'validation_rules_json')
     def _check_json_fields(self):
         json_fields = [
-            ('json_template', 'Default JSON Structure'),
-            ('required_fields_json', 'Required Fields'),
-            ('optional_fields_json', 'Optional Fields'),
-            ('auto_mapping_json', 'Auto-fill Mapping'),
-            ('validation_rules_json', 'Validation Rules'),
+            ('json_template', 'Default JSON Structure', dict),
+            ('required_fields_json', 'Required Fields', list),
+            ('optional_fields_json', 'Optional Fields', list),
+            ('auto_mapping_json', 'Auto-fill Mapping', dict),
+            ('validation_rules_json', 'Validation Rules', dict),
         ]
         for rec in self:
-            for fname, label in json_fields:
+            for fname, label, expected_type in json_fields:
                 val = getattr(rec, fname)
                 if val:
                     try:
-                        json.loads(val)
+                        parsed = json.loads(val)
                     except (json.JSONDecodeError, TypeError):
                         raise ValidationError(f'"{label}" must contain valid JSON.')
+                    if not isinstance(parsed, expected_type):
+                        raise ValidationError(
+                            f'"{label}" must be a JSON {expected_type.__name__}.'
+                        )
 
     def unlink(self):
         for rec in self:

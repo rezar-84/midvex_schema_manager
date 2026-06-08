@@ -92,11 +92,15 @@ Use these buttons for external checks:
 - **Open Schema Markup Validator**
 - **Open Google Rich Results Test**
 
+Structured data must match visible page content. Do not add FAQ, Review, Product, Article, or business markup unless the target page visibly contains the same facts.
+
 ## Language Workflow
 
 Create one schema record per language. Use **Create for All Languages** from a source schema record to duplicate it for active website languages.
 
 Records are rendered only when their language matches the current frontend request language. Leave the language blank only when the schema should apply to every language.
+
+When **Auto-fill from page SEO metadata** is enabled, page SEO values are read in the schema record language first. If a translated SEO title or description is not available, Odoo falls back to the source/base page value.
 
 ## Batch Operations
 
